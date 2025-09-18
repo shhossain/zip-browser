@@ -79,7 +79,7 @@ pip install git+https://github.com/shhossain/zip-browser.git
 
 ```bash
 git clone https://github.com/shhossain/zip-browser.git
-cd zip_file_viewer
+cd zip-browser
 uv pip install -e .
 ```
 
@@ -190,8 +190,8 @@ The executable will be created in `dist/zip-browser.exe` (~35 MB, completely sel
 
 User accounts are stored in:
 
-- **Windows:** `%USERPROFILE%\.zip_file_viewer\users.json`
-- **Linux/macOS:** `~/.zip_file_viewer/users.json`
+- **Windows:** `%USERPROFILE%\.zip-browser\users.json`
+- **Linux/macOS:** `~/.zip-browser/users.json`
 
 ### Security Features
 

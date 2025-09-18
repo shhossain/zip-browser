@@ -194,7 +194,7 @@ try {
     } else {
         # Interactive mode: use persistent directory
         Write-ColorOutput "Step 2: Setting up zip-browser..." $Blue
-        $repoPath = "zip_file_viewer"
+        $repoPath = "zip-browser"
         
         if (Test-Path $repoPath) {
             Write-ColorOutput "Repository already exists. Updating..." $Yellow

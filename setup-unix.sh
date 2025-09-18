@@ -122,7 +122,7 @@ main() {
 
     # Step 2: Clone repository
     print_color $BLUE "Step 2: Setting up zip-browser..."
-    REPO_PATH="zip_file_viewer"
+    REPO_PATH="zip-browser"
     
     if [[ -d "$REPO_PATH" ]]; then
         print_color $YELLOW "Repository already exists. Updating..."
