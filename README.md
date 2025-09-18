@@ -1,8 +1,11 @@
-# ZIP File Viewer
+# ZIP Browser
 
 A modern, modular Flask web application for browsing and viewing files inside offline and online ZIP archives with multi-user authentication and CSRF protection.
 
-![ZIP File Viewer](https://raw.githubusercontent.com/shhossain/zip-browser/main/screenshot.png)
+![Login](https://raw.githubusercontent.com/shhossain/zip-browser/main/images/login.png)
+![All Zips](https://raw.githubusercontent.com/shhossain/zip-browser/main/images/all_zips.png)
+![Single Zip](https://raw.githubusercontent.com/shhossain/zip-browser/main/images/single_zip.png)
+![Photo View](https://raw.githubusercontent.com/shhossain/zip-browser/main/images/photo_view.png)
 
 ## Quick Start
 

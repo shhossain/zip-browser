@@ -110,11 +110,11 @@ def main():
     print("=" * 40)
 
     # Create the icon
-    icon_path = "zip-browser-icon.ico"
+    icon_path = "images/zip-browser-icon.ico"
     create_ico_file(icon_path)
 
     # Also create a PNG version for preview
-    png_path = "zip-browser-icon.png"
+    png_path = "images/zip-browser-icon.png"
     preview_img = create_icon_image(256)
     preview_img.save(png_path, format='PNG')
     print(f"📷 Preview PNG created: {png_path}")
