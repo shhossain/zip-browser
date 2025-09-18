@@ -25,10 +25,10 @@ A modern, modular Flask web application for browsing and viewing files inside of
    curl -fsSL https://raw.githubusercontent.com/shhossain/zip-browser/main/install.sh | sh
    ```
 
-2. **Create an admin user:**
+2. **Create a user:**
 
    ```bash
-   zip-browser user create admin --admin
+   zip-browser user create admin -p admin
    ```
 
 3. **Start the server:**
