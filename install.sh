@@ -57,7 +57,7 @@ main() {
     echo
     print_color $BLUE "Next steps:"
     print_color $YELLOW "1. Restart your terminal or run: source ~/.$(basename $SHELL)rc"
-    print_color $YELLOW "2. Run: zip-browser user create admin --admin"
+    print_color $YELLOW "2. Run: zip-browser user create admin -p admin"
     print_color $YELLOW "3. Run: zip-browser server path/to/your/zip/files"
     print_color $YELLOW "4. Open: http://localhost:5000"
 }

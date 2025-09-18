@@ -179,7 +179,7 @@ main() {
     print_color $YELLOW "1. Restart your terminal or run: source ~/.$(basename $SHELL)rc"
     echo
     print_color $YELLOW "2. Create an admin user:"
-    echo "   zip-browser user create admin --admin"
+    echo "   zip-browser user create admin -p admin"
     echo
     print_color $YELLOW "3. Start the server:"
     echo "   zip-browser server path/to/your/zip/files"

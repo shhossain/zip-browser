@@ -134,7 +134,7 @@ def main():
     print(f"   Location: {os.path.abspath('dist/zip-browser.exe')}")
     print("\n🔧 Usage examples:")
     print("   .\\dist\\zip-browser.exe --help")
-    print("   .\\dist\\zip-browser.exe user create admin --admin")
+    print("   .\\dist\\zip-browser.exe user create admin -p admin")
     print("   .\\dist\\zip-browser.exe server path/to/your/file.zip")
 
 if __name__ == "__main__":

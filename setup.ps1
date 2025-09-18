@@ -269,7 +269,7 @@ try {
         Write-ColorOutput ""
         Write-ColorOutput "Next steps:" $Blue
         Write-ColorOutput "1. Create an admin user:" $Yellow
-        Write-ColorOutput "   zip-browser user create admin --admin" $Reset
+        Write-ColorOutput "   zip-browser user create admin -p admin" $Reset
         Write-ColorOutput ""
         Write-ColorOutput "2. Start the server:" $Yellow
         Write-ColorOutput "   zip-browser server path/to/your/zip/files" $Reset
@@ -281,7 +281,7 @@ try {
         Write-ColorOutput ""
         Write-ColorOutput "Next steps:" $Blue
         Write-ColorOutput "1. Restart your terminal" $Yellow
-        Write-ColorOutput "2. Run: zip-browser user create admin --admin" $Yellow
+        Write-ColorOutput "2. Run: zip-browser user create admin -p admin" $Yellow
         Write-ColorOutput "3. Run: zip-browser server path/to/your/zip/files" $Yellow
         Write-ColorOutput "4. Open: http://localhost:5000" $Yellow
     }
