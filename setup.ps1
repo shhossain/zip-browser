@@ -3,7 +3,7 @@
 .SYNOPSIS
     Setup script for ZIP File Viewer on Windows
 .DESCRIPTION
-    This script installs uv, clones the zip-viewer repository, installs the package, 
+    This script installs uv, clones the zip-browser repository, installs the package, 
     and ensures it's available in the PATH. Can run in quick mode or interactive mode.
 .PARAMETER Quick
     Run in quick/silent mode (minimal output, no interaction)
@@ -16,7 +16,7 @@
     .\setup.ps1 -Quick
     Run in quick/silent mode (good for automation)
 .EXAMPLE
-    powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/shhossain/zip_file_viewer/main/setup.ps1 | iex"
+    powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/shhossain/zip-browser/main/setup.ps1 | iex"
     One-liner installation from web
 #>
 
@@ -99,8 +99,8 @@ function Add-ToPath {
 
 function Test-Installation {
     try {
-        if (Test-CommandExists "zip-viewer") {
-            $null = zip-viewer --help 2>$null
+        if (Test-CommandExists "zip-browser") {
+            $null = zip-browser --help 2>$null
             return $LASTEXITCODE -eq 0
         }
         return $false
@@ -124,7 +124,7 @@ try {
         if (-not $Quick) {
             Write-ColorOutput ""
             Write-ColorOutput "Use -Force to reinstall or run:" $Yellow
-            Write-ColorOutput "  zip-viewer --help" $Reset
+            Write-ColorOutput "  zip-browser --help" $Reset
         }
         exit 0
     }
@@ -181,7 +181,7 @@ try {
     # Step 2: Setup repository
     if ($Quick) {
         # Quick mode: use temp directory
-        $repoPath = Join-Path $env:TEMP "zip-viewer-install-$(Get-Random)"
+        $repoPath = Join-Path $env:TEMP "zip-browser-install-$(Get-Random)"
         Write-ColorOutput "📥 Downloading ZIP File Viewer..." $Yellow
         
         if (Test-Path $repoPath) { 
@@ -190,10 +190,10 @@ try {
         New-Item $repoPath -ItemType Directory | Out-Null
         Set-Location $repoPath
         
-        git clone https://github.com/shhossain/zip_file_viewer.git . 2>$null
+        git clone https://github.com/shhossain/zip-browser.git . 2>$null
     } else {
         # Interactive mode: use persistent directory
-        Write-ColorOutput "Step 2: Setting up zip-viewer..." $Blue
+        Write-ColorOutput "Step 2: Setting up zip-browser..." $Blue
         $repoPath = "zip_file_viewer"
         
         if (Test-Path $repoPath) {
@@ -203,7 +203,7 @@ try {
         }
         else {
             Write-ColorOutput "Cloning repository..." $Yellow
-            git clone https://github.com/shhossain/zip_file_viewer.git $repoPath 2>$null
+            git clone https://github.com/shhossain/zip-browser.git $repoPath 2>$null
             Set-Location $repoPath
         }
         Write-ColorOutput ""
@@ -213,7 +213,7 @@ try {
     if ($Quick) {
         Write-ColorOutput "⚙️ Installing package..." $Yellow
     } else {
-        Write-ColorOutput "Step 3: Installing zip-viewer..." $Blue
+        Write-ColorOutput "Step 3: Installing zip-browser..." $Blue
         Write-ColorOutput "Installing package with uv..." $Yellow
     }
     
@@ -269,20 +269,20 @@ try {
         Write-ColorOutput ""
         Write-ColorOutput "Next steps:" $Blue
         Write-ColorOutput "1. Create an admin user:" $Yellow
-        Write-ColorOutput "   zip-viewer user create admin --admin" $Reset
+        Write-ColorOutput "   zip-browser user create admin --admin" $Reset
         Write-ColorOutput ""
         Write-ColorOutput "2. Start the server:" $Yellow
-        Write-ColorOutput "   zip-viewer server path/to/your/zip/files" $Reset
+        Write-ColorOutput "   zip-browser server path/to/your/zip/files" $Reset
         Write-ColorOutput ""
         Write-ColorOutput "3. Open your browser to http://localhost:5000" $Yellow
         Write-ColorOutput ""
-        Write-ColorOutput "If zip-viewer command is not found, restart your terminal and try again." $Blue
+        Write-ColorOutput "If zip-browser command is not found, restart your terminal and try again." $Blue
     } else {
         Write-ColorOutput ""
         Write-ColorOutput "Next steps:" $Blue
         Write-ColorOutput "1. Restart your terminal" $Yellow
-        Write-ColorOutput "2. Run: zip-viewer user create admin --admin" $Yellow
-        Write-ColorOutput "3. Run: zip-viewer server path/to/your/zip/files" $Yellow
+        Write-ColorOutput "2. Run: zip-browser user create admin --admin" $Yellow
+        Write-ColorOutput "3. Run: zip-browser server path/to/your/zip/files" $Yellow
         Write-ColorOutput "4. Open: http://localhost:5000" $Yellow
     }
 

@@ -7,12 +7,12 @@ import sys
 import os
 
 def main():
-    """Entry point for the zip-viewer command line tool."""
+    """Entry point for the zip-browser command line tool."""
     # Add the package directory to the Python path
     package_dir = os.path.dirname(os.path.abspath(__file__))
     if package_dir not in sys.path:
         sys.path.insert(0, package_dir)
-    
+
     # Import and run the main application
     try:
         from src.app import main as app_main

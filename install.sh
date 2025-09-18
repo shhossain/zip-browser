@@ -1,6 +1,6 @@
 #!/bin/bash
 # ZIP File Viewer Installer for Linux/macOS
-# Usage: curl -fsSL https://raw.githubusercontent.com/shhossain/zip_file_viewer/main/install.sh | sh
+# Usage: curl -fsSL https://raw.githubusercontent.com/shhossain/zip-browser/main/install.sh | sh
 
 set -e
 
@@ -44,7 +44,7 @@ main() {
     
     # Clone and install
     print_color $YELLOW "📥 Downloading ZIP File Viewer..."
-    git clone https://github.com/shhossain/zip_file_viewer.git .
+    git clone https://github.com/shhossain/zip-browser.git .
     
     print_color $YELLOW "⚙️ Installing package..."
     uv pip install .
@@ -57,8 +57,8 @@ main() {
     echo
     print_color $BLUE "Next steps:"
     print_color $YELLOW "1. Restart your terminal or run: source ~/.$(basename $SHELL)rc"
-    print_color $YELLOW "2. Run: zip-viewer user create admin --admin"
-    print_color $YELLOW "3. Run: zip-viewer server path/to/your/zip/files"
+    print_color $YELLOW "2. Run: zip-browser user create admin --admin"
+    print_color $YELLOW "3. Run: zip-browser server path/to/your/zip/files"
     print_color $YELLOW "4. Open: http://localhost:5000"
 }
 

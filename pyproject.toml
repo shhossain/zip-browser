@@ -1,5 +1,5 @@
 [project]
-name = "zip-file-viewer"
+name = "zip-browser"
 version = "0.1.0"
 description = "A modern Flask web application for browsing and viewing files inside ZIP archives with multi-user authentication"
 readme = "README.md"
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-zip-viewer = "cli_entry:main"
+zip-browser = "cli_entry:main"
 
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]

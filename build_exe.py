@@ -11,7 +11,7 @@ from pathlib import Path
 
 def ensure_icon_exists():
     """Ensure the icon file exists, create it if needed."""
-    icon_path = Path('zip-viewer-icon.ico')
+    icon_path = Path("zip-browser-icon.ico")
     if not icon_path.exists():
         print("🎨 Creating application icon...")
         try:
@@ -56,10 +56,10 @@ def clean_build():
 def build_executable():
     """Build the executable using PyInstaller."""
     print("🔨 Building executable with PyInstaller...")
-    
+
     try:
         # Run PyInstaller with the spec file
-        cmd = ['pyinstaller', 'zip-viewer.spec']
+        cmd = ["pyinstaller", "zip-browser.spec"]
         subprocess.run(cmd, check=True, capture_output=True, text=True)
         print("✅ Build completed successfully!")
         return True
@@ -74,12 +74,12 @@ def build_executable():
 def test_executable():
     """Test if the built executable works."""
     print("🧪 Testing the built executable...")
-    
-    exe_path = Path('dist/zip-viewer.exe')
+
+    exe_path = Path("dist/zip-browser.exe")
     if not exe_path.exists():
-        print("❌ Executable not found in dist/zip-viewer.exe")
+        print("❌ Executable not found in dist/zip-browser.exe")
         return False
-    
+
     try:
         # Test help command
         result = subprocess.run([str(exe_path), '--help'], 
@@ -103,16 +103,18 @@ def main():
     """Main build process."""
     print("🚀 ZIP File Viewer - Executable Build Script")
     print("=" * 50)
-    
+
     # Check if we're in the right directory
     if not os.path.exists('main.py'):
         print("❌ Error: main.py not found. Please run this script from the project root.")
         sys.exit(1)
-    
-    if not os.path.exists('zip-viewer.spec'):
-        print("❌ Error: zip-viewer.spec not found. Please run PyInstaller first to generate it.")
+
+    if not os.path.exists("zip-browser.spec"):
+        print(
+            "❌ Error: zip-browser.spec not found. Please run PyInstaller first to generate it."
+        )
         sys.exit(1)
-    
+
     # Build process
     steps = [
         ("Ensuring icon exists", ensure_icon_exists),
@@ -120,20 +122,20 @@ def main():
         ("Building executable", build_executable),
         ("Testing executable", test_executable),
     ]
-    
+
     for step_name, step_func in steps:
         print(f"\n📋 {step_name}...")
         if not step_func():
             print(f"\n❌ Build process failed at: {step_name}")
             sys.exit(1)
-    
+
     print("\n🎉 Build process completed successfully!")
     print("\n📦 Your executable is ready:")
-    print(f"   Location: {os.path.abspath('dist/zip-viewer.exe')}")
+    print(f"   Location: {os.path.abspath('dist/zip-browser.exe')}")
     print("\n🔧 Usage examples:")
-    print("   .\\dist\\zip-viewer.exe --help")
-    print("   .\\dist\\zip-viewer.exe user create admin --admin")
-    print("   .\\dist\\zip-viewer.exe server path/to/your/file.zip")
+    print("   .\\dist\\zip-browser.exe --help")
+    print("   .\\dist\\zip-browser.exe user create admin --admin")
+    print("   .\\dist\\zip-browser.exe server path/to/your/file.zip")
 
 if __name__ == "__main__":
     main()

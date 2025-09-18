@@ -2,6 +2,8 @@
 
 A modern, modular Flask web application for browsing and viewing files inside offline and online ZIP archives with multi-user authentication and CSRF protection.
 
+![ZIP File Viewer](https://raw.githubusercontent.com/shhossain/zip-browser/main/screenshot.png)
+
 ## Quick Start
 
 ### Simple Steps to Run
@@ -11,25 +13,25 @@ A modern, modular Flask web application for browsing and viewing files inside of
    **Windows (PowerShell):**
 
    ```powershell
-   powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/shhossain/zip_file_viewer/main/setup.ps1 | iex"
+   powershell -ExecutionPolicy ByPass -c "irm https://raw.githubusercontent.com/shhossain/zip-browser/main/setup.ps1 | iex"
    ```
 
    **Linux/macOS (Bash):**
 
    ```bash
-   curl -fsSL https://raw.githubusercontent.com/shhossain/zip_file_viewer/main/install.sh | sh
+   curl -fsSL https://raw.githubusercontent.com/shhossain/zip-browser/main/install.sh | sh
    ```
 
 2. **Create an admin user:**
 
    ```bash
-   zip-viewer user create admin --admin
+   zip-browser user create admin --admin
    ```
 
 3. **Start the server:**
 
    ```bash
-   zip-viewer server path/to/your/file.zip
+   zip-browser server path/to/your/file.zip
    ```
 
 4. **Access the application:**
@@ -64,16 +66,16 @@ That's it! You're ready to browse your ZIP files.
 
 ```bash
 # Using uv (recommended)
-uv pip install git+https://github.com/shhossain/zip_file_viewer.git
+uv pip install git+https://github.com/shhossain/zip-browser.git
 
 # Or using pip
-pip install git+https://github.com/shhossain/zip_file_viewer.git
+pip install git+https://github.com/shhossain/zip-browser.git
 ```
 
 #### Install from Source
 
 ```bash
-git clone https://github.com/shhossain/zip_file_viewer.git
+git clone https://github.com/shhossain/zip-browser.git
 cd zip_file_viewer
 uv pip install -e .
 ```
@@ -83,7 +85,7 @@ uv pip install -e .
 ### Basic Usage
 
 ```
-usage: zip-viewer [-h] {server,user} ...
+usage: zip-browser [-h] {server,user} ...
 
 ZIP File Viewer with Multi-User Authentication
 
@@ -99,7 +101,7 @@ options:
 ### Server Command
 
 ```
-usage: zip-viewer server [-h] [-H HOST] [-P PORT] [-D] [-u USERNAME] [-p PASSWORD] zip_paths [zip_paths ...]
+usage: zip-browser server [-h] [-H HOST] [-P PORT] [-D] [-u USERNAME] [-p PASSWORD] zip_paths [zip_paths ...]
 
 positional arguments:
   zip_paths             Path(s) to ZIP file(s) - can be single files, directories with ZIP files, URLs to remote ZIP files, or txt file containing list of zip URLs
@@ -118,7 +120,7 @@ options:
 ### User Management Commands
 
 ```
-usage: zip-viewer user [-h] {create,list,show,update,passwd,delete,info} ...
+usage: zip-browser user [-h] {create,list,show,update,passwd,delete,info} ...
 
 positional arguments:
   {create,list,show,update,passwd,delete,info}
@@ -139,30 +141,30 @@ options:
 
 ```bash
 # Basic usage
-zip-viewer server /path/to/archive.zip
+zip-browser server /path/to/archive.zip
 
 # Multiple ZIP files
-zip-viewer server /path/to/zip-folder/
+zip-browser server /path/to/zip-folder/
 
 # Remote ZIP files from URLs
-zip-viewer server https://example.com/archive.zip
-zip-viewer server https://github.com/user/repo/archive/main.zip
+zip-browser server https://example.com/archive.zip
+zip-browser server https://github.com/user/repo/archive/main.zip
 
 # Password-protected ZIP files (you'll be prompted for password)
-zip-viewer server /path/to/protected.zip
+zip-browser server /path/to/protected.zip
 
 # Custom configuration
-zip-viewer server /path/to/files --host 127.0.0.1 --port 8080 --debug
+zip-browser server /path/to/files --host 127.0.0.1 --port 8080 --debug
 
 # User management
-zip-viewer user create john --email john@example.com
-zip-viewer user list --detailed
-zip-viewer user update john --admin
-zip-viewer user passwd john
-zip-viewer user delete john
+zip-browser user create john --email john@example.com
+zip-browser user list --detailed
+zip-browser user update john --admin
+zip-browser user passwd john
+zip-browser user delete john
 
 # Legacy single-user mode (backward compatibility)
-zip-viewer server /path/to/files --username admin --password secret
+zip-browser server /path/to/files --username admin --password secret
 ```
 
 ## Optional: Building Executable
@@ -177,7 +179,7 @@ uv pip install pyinstaller
 python build_exe.py
 ```
 
-The executable will be created in `dist/zip-viewer.exe` (~35 MB, completely self-contained).
+The executable will be created in `dist/zip-browser.exe` (~35 MB, completely self-contained).
 
 ## Additional Information
 

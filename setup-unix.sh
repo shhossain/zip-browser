@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Setup script for zip-viewer on Linux and macOS
-# This script installs uv, clones the zip-viewer repository, installs the package,
+# Setup script for zip-browser on Linux and macOS
+# This script installs uv, clones the zip-browser repository, installs the package,
 # and ensures it's available in the PATH.
 #
 # Usage: ./setup-unix.sh
@@ -121,7 +121,7 @@ main() {
     echo
 
     # Step 2: Clone repository
-    print_color $BLUE "Step 2: Setting up zip-viewer..."
+    print_color $BLUE "Step 2: Setting up zip-browser..."
     REPO_PATH="zip_file_viewer"
     
     if [[ -d "$REPO_PATH" ]]; then
@@ -130,14 +130,14 @@ main() {
         git pull origin main || print_color $YELLOW "Warning: Could not update repository"
     else
         print_color $YELLOW "Cloning repository..."
-        git clone https://github.com/shhossain/zip_file_viewer.git "$REPO_PATH"
+        git clone https://github.com/shhossain/zip-browser.git "$REPO_PATH"
         cd "$REPO_PATH"
     fi
 
     echo
 
     # Step 3: Install the package
-    print_color $BLUE "Step 3: Installing zip-viewer..."
+    print_color $BLUE "Step 3: Installing zip-browser..."
     print_color $YELLOW "Installing package with uv..."
     
     if uv pip install -e .; then
@@ -152,8 +152,8 @@ main() {
     # Step 4: Verify installation
     print_color $BLUE "Step 4: Verifying installation..."
     
-    if uv run zip-viewer --help >/dev/null 2>&1; then
-        print_color $GREEN "zip-viewer is working correctly!"
+    if uv run zip-browser --help >/dev/null 2>&1; then
+        print_color $GREEN "zip-browser is working correctly!"
     else
         print_color $YELLOW "Verification failed. Trying to add uv bin to PATH..."
         
@@ -179,14 +179,14 @@ main() {
     print_color $YELLOW "1. Restart your terminal or run: source ~/.$(basename $SHELL)rc"
     echo
     print_color $YELLOW "2. Create an admin user:"
-    echo "   zip-viewer user create admin --admin"
+    echo "   zip-browser user create admin --admin"
     echo
     print_color $YELLOW "3. Start the server:"
-    echo "   zip-viewer server path/to/your/zip/files"
+    echo "   zip-browser server path/to/your/zip/files"
     echo
     print_color $YELLOW "4. Open your browser to http://localhost:5000"
     echo
-    print_color $BLUE "If zip-viewer command is not found, restart your terminal and try again."
+    print_color $BLUE "If zip-browser command is not found, restart your terminal and try again."
 }
 
 # Check for required tools
