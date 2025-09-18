@@ -42,9 +42,64 @@ main() {
     TEMP_DIR=$(mktemp -d)
     cd "$TEMP_DIR"
     
-    # Clone and install
+    # Download and install
     print_color $YELLOW "📥 Downloading ZIP File Viewer..."
-    git clone https://github.com/shhossain/zip-browser.git .
+    if command_exists git; then
+        git clone https://github.com/shhossain/zip-browser.git .
+    else
+        print_color $YELLOW "Git not found, downloading ZIP archive..."
+        ZIP_URL="https://github.com/shhossain/zip-browser/archive/refs/heads/main.zip"
+        ZIP_FILE="main.zip"
+        
+        if command_exists curl; then
+            curl -L "$ZIP_URL" -o "$ZIP_FILE"
+        elif command_exists wget; then
+            wget "$ZIP_URL" -O "$ZIP_FILE"
+        else
+            print_color $RED "❌ Error: Neither git, curl, nor wget found"
+            exit 1
+        fi
+        
+        # Extract ZIP file
+        if command_exists unzip; then
+            unzip -q "$ZIP_FILE"
+            mv zip-browser-main/* .
+            rm -rf zip-browser-main "$ZIP_FILE"
+        else
+            print_color $YELLOW "unzip not found, installing git and cloning instead..."
+            rm -f "$ZIP_FILE"
+            
+            # Try to install git
+            if command_exists apt-get; then
+                print_color $YELLOW "Installing git with apt-get..."
+                sudo apt-get update && sudo apt-get install -y git
+            elif command_exists yum; then
+                print_color $YELLOW "Installing git with yum..."
+                sudo yum install -y git
+            elif command_exists dnf; then
+                print_color $YELLOW "Installing git with dnf..."
+                sudo dnf install -y git
+            elif command_exists brew; then
+                print_color $YELLOW "Installing git with brew..."
+                brew install git
+            elif command_exists pacman; then
+                print_color $YELLOW "Installing git with pacman..."
+                sudo pacman -S --noconfirm git
+            else
+                print_color $RED "❌ Error: Cannot install git automatically. Please install git or unzip manually."
+                exit 1
+            fi
+            
+            # Verify git installation
+            if command_exists git; then
+                print_color $GREEN "Git installed successfully! Cloning repository..."
+                git clone https://github.com/shhossain/zip-browser.git .
+            else
+                print_color $RED "❌ Error: Git installation failed. Please install git or unzip manually."
+                exit 1
+            fi
+        fi
+    fi
     
     print_color $YELLOW "⚙️ Installing package..."
     uv pip install .
@@ -63,8 +118,8 @@ main() {
 }
 
 # Check requirements
-if ! command_exists git; then
-    print_color $RED "❌ Error: git is required but not installed"
+if ! command_exists curl && ! command_exists wget && ! command_exists git; then
+    print_color $RED "❌ Error: At least one of git, curl, or wget is required"
     exit 1
 fi
 

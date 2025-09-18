@@ -68,6 +68,61 @@ add_to_path() {
     return 1
 }
 
+# Function to install git
+install_git() {
+    print_color $YELLOW "Installing git..."
+    
+    local OS=$(detect_os)
+    case $OS in
+        "linux")
+            # Try different package managers
+            if command_exists apt-get; then
+                print_color $YELLOW "Using apt-get to install git..."
+                sudo apt-get update && sudo apt-get install -y git
+            elif command_exists yum; then
+                print_color $YELLOW "Using yum to install git..."
+                sudo yum install -y git
+            elif command_exists dnf; then
+                print_color $YELLOW "Using dnf to install git..."
+                sudo dnf install -y git
+            elif command_exists pacman; then
+                print_color $YELLOW "Using pacman to install git..."
+                sudo pacman -S --noconfirm git
+            elif command_exists zypper; then
+                print_color $YELLOW "Using zypper to install git..."
+                sudo zypper install -y git
+            else
+                print_color $RED "No supported package manager found. Please install git manually."
+                return 1
+            fi
+            ;;
+        "macos")
+            if command_exists brew; then
+                print_color $YELLOW "Using brew to install git..."
+                brew install git
+            else
+                print_color $YELLOW "Installing Xcode Command Line Tools (includes git)..."
+                xcode-select --install
+                print_color $YELLOW "Please run this script again after the installation completes."
+                exit 0
+            fi
+            ;;
+        *)
+            print_color $RED "Unsupported OS. Please install git manually."
+            return 1
+            ;;
+    esac
+    
+    # Verify installation
+    if command_exists git; then
+        print_color $GREEN "Git installed successfully!"
+        return 0
+    else
+        print_color $RED "Git installation failed."
+        return 1
+    fi
+}
+
 # Function to detect OS
 detect_os() {
     if [[ "$OSTYPE" == "linux-gnu"* ]]; then
@@ -120,18 +175,61 @@ main() {
 
     echo
 
-    # Step 2: Clone repository
+    # Step 2: Clone or download repository
     print_color $BLUE "Step 2: Setting up zip-browser..."
     REPO_PATH="zip-browser"
     
     if [[ -d "$REPO_PATH" ]]; then
         print_color $YELLOW "Repository already exists. Updating..."
         cd "$REPO_PATH"
-        git pull origin main || print_color $YELLOW "Warning: Could not update repository"
+        if command_exists git; then
+            git pull origin main || print_color $YELLOW "Warning: Could not update repository"
+        else
+            print_color $YELLOW "Git not available, skipping update..."
+        fi
     else
-        print_color $YELLOW "Cloning repository..."
-        git clone https://github.com/shhossain/zip-browser.git "$REPO_PATH"
-        cd "$REPO_PATH"
+        if command_exists git; then
+            print_color $YELLOW "Cloning repository..."
+            git clone https://github.com/shhossain/zip-browser.git "$REPO_PATH"
+            cd "$REPO_PATH"
+        else
+            print_color $YELLOW "Git not available, downloading ZIP archive..."
+            ZIP_URL="https://github.com/shhossain/zip-browser/archive/refs/heads/main.zip"
+            ZIP_FILE="main.zip"
+            
+            # Download ZIP file
+            if command_exists curl; then
+                print_color $YELLOW "Using curl to download..."
+                curl -L "$ZIP_URL" -o "$ZIP_FILE"
+            elif command_exists wget; then
+                print_color $YELLOW "Using wget to download..."
+                wget "$ZIP_URL" -O "$ZIP_FILE"
+            else
+                print_color $RED "Error: Neither git, curl, nor wget is available"
+                exit 1
+            fi
+            
+            # Extract ZIP file
+            if command_exists unzip; then
+                print_color $YELLOW "Extracting archive..."
+                unzip -q "$ZIP_FILE"
+                mv zip-browser-main "$REPO_PATH"
+                rm "$ZIP_FILE"
+                cd "$REPO_PATH"
+            else
+                print_color $YELLOW "unzip not found, installing git and cloning instead..."
+                rm -f "$ZIP_FILE"
+                
+                if install_git; then
+                    print_color $GREEN "Git installed successfully! Cloning repository..."
+                    git clone https://github.com/shhossain/zip-browser.git "$REPO_PATH"
+                    cd "$REPO_PATH"
+                else
+                    print_color $RED "Error: Cannot install git automatically. Please install git or unzip manually."
+                    exit 1
+                fi
+            fi
+        fi
     fi
 
     echo
@@ -191,25 +289,26 @@ main() {
 
 # Check for required tools
 check_requirements() {
-    local missing_tools=()
+    local missing_download_tools=0
     
-    if ! command_exists git; then
-        missing_tools+=("git")
+    # Check if we have at least one download method
+    if ! command_exists git && ! command_exists curl && ! command_exists wget; then
+        missing_download_tools=1
     fi
     
-    if [[ ${#missing_tools[@]} -gt 0 ]]; then
-        print_color $RED "Error: Missing required tools: ${missing_tools[*]}"
+    if [[ $missing_download_tools -eq 1 ]]; then
+        print_color $RED "Error: At least one of git, curl, or wget is required for downloading"
         print_color $YELLOW "Please install them first:"
         
         OS=$(detect_os)
         case $OS in
             "linux")
-                print_color $YELLOW "  Ubuntu/Debian: sudo apt update && sudo apt install ${missing_tools[*]}"
-                print_color $YELLOW "  CentOS/RHEL: sudo yum install ${missing_tools[*]}"
-                print_color $YELLOW "  Fedora: sudo dnf install ${missing_tools[*]}"
+                print_color $YELLOW "  Ubuntu/Debian: sudo apt update && sudo apt install git curl wget"
+                print_color $YELLOW "  CentOS/RHEL: sudo yum install git curl wget"
+                print_color $YELLOW "  Fedora: sudo dnf install git curl wget"
                 ;;
             "macos")
-                print_color $YELLOW "  macOS: brew install ${missing_tools[*]}"
+                print_color $YELLOW "  macOS: brew install git curl wget"
                 print_color $YELLOW "  Or install Xcode Command Line Tools: xcode-select --install"
                 ;;
         esac

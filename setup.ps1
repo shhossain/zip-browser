@@ -110,6 +110,61 @@ function Test-Installation {
     }
 }
 
+function Install-Git {
+    param([bool]$Quick = $false)
+    
+    if (-not $Quick) {
+        Write-ColorOutput "Installing Git..." $Yellow
+    }
+    
+    try {
+        # Try winget first (Windows 10+)
+        if (Test-CommandExists "winget") {
+            if (-not $Quick) {
+                Write-ColorOutput "Using winget to install Git..." $Yellow
+            }
+            winget install --id Git.Git -e --source winget --silent | Out-Null
+        }
+        # Try chocolatey as fallback
+        elseif (Test-CommandExists "choco") {
+            if (-not $Quick) {
+                Write-ColorOutput "Using chocolatey to install Git..." $Yellow
+            }
+            choco install git -y | Out-Null
+        }
+        # Try scoop as another fallback
+        elseif (Test-CommandExists "scoop") {
+            if (-not $Quick) {
+                Write-ColorOutput "Using scoop to install Git..." $Yellow
+            }
+            scoop install git | Out-Null
+        }
+        else {
+            Write-ColorOutput "❌ No package manager found. Please install Git manually from https://git-scm.com/" $Red
+            return $false
+        }
+        
+        # Refresh PATH to include git
+        $env:PATH = [System.Environment]::GetEnvironmentVariable("PATH", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("PATH", "User")
+        
+        # Verify installation
+        if (Test-CommandExists "git") {
+            if (-not $Quick) {
+                Write-ColorOutput "Git installed successfully!" $Green
+            }
+            return $true
+        }
+        else {
+            Write-ColorOutput "❌ Git installation failed. Please install Git manually." $Red
+            return $false
+        }
+    }
+    catch {
+        Write-ColorOutput "❌ Failed to install Git: $_" $Red
+        return $false
+    }
+}
+
 try {
     if (-not $Quick) {
         Write-ColorOutput "=== ZIP File Viewer Setup for Windows ===" $Blue
@@ -190,7 +245,45 @@ try {
         New-Item $repoPath -ItemType Directory | Out-Null
         Set-Location $repoPath
         
-        git clone https://github.com/shhossain/zip-browser.git . 2>$null
+        if (Test-CommandExists "git") {
+            git clone https://github.com/shhossain/zip-browser.git . 2>$null
+        } else {
+            # Download ZIP if git is not available
+            $zipUrl = "https://github.com/shhossain/zip-browser/archive/refs/heads/main.zip"
+            $zipFile = "main.zip"
+            
+            try {
+                Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing | Out-Null
+                Expand-Archive -Path $zipFile -DestinationPath . -Force
+                
+                # Move contents from extracted folder to current directory
+                $extractedFolder = "zip-browser-main"
+                if (Test-Path $extractedFolder) {
+                    Get-ChildItem $extractedFolder | Move-Item -Destination . -Force
+                    Remove-Item $extractedFolder -Recurse -Force
+                }
+                Remove-Item $zipFile -Force
+            }
+            catch {
+                Write-ColorOutput "ZIP extraction failed, installing Git and cloning..." $Yellow
+                Remove-Item $zipFile -Force -ErrorAction SilentlyContinue
+                
+                if (Install-Git -Quick $Quick) {
+                    try {
+                        git clone https://github.com/shhossain/zip-browser.git . 2>$null
+                        Write-ColorOutput "Repository cloned successfully!" $Green
+                    }
+                    catch {
+                        Write-ColorOutput "❌ Failed to clone repository: $_" $Red
+                        exit 1
+                    }
+                }
+                else {
+                    Write-ColorOutput "❌ Failed to install Git. Please install Git or PowerShell 5.0+ manually." $Red
+                    exit 1
+                }
+            }
+        }
     } else {
         # Interactive mode: use persistent directory
         Write-ColorOutput "Step 2: Setting up zip-browser..." $Blue
@@ -199,12 +292,62 @@ try {
         if (Test-Path $repoPath) {
             Write-ColorOutput "Repository already exists. Updating..." $Yellow
             Set-Location $repoPath
-            git pull origin main 2>$null
+            if (Test-CommandExists "git") {
+                git pull origin main 2>$null
+            } else {
+                Write-ColorOutput "Git not available, skipping update..." $Yellow
+            }
         }
         else {
-            Write-ColorOutput "Cloning repository..." $Yellow
-            git clone https://github.com/shhossain/zip-browser.git $repoPath 2>$null
-            Set-Location $repoPath
+            if (Test-CommandExists "git") {
+                Write-ColorOutput "Cloning repository..." $Yellow
+                git clone https://github.com/shhossain/zip-browser.git $repoPath 2>$null
+                Set-Location $repoPath
+            } else {
+                Write-ColorOutput "Git not available, downloading ZIP..." $Yellow
+                New-Item $repoPath -ItemType Directory | Out-Null
+                Set-Location $repoPath
+                
+                $zipUrl = "https://github.com/shhossain/zip-browser/archive/refs/heads/main.zip"
+                $zipFile = "main.zip"
+                
+                try {
+                    Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile -UseBasicParsing | Out-Null
+                    Expand-Archive -Path $zipFile -DestinationPath . -Force
+                    
+                    # Move contents from extracted folder to current directory
+                    $extractedFolder = "zip-browser-main"
+                    if (Test-Path $extractedFolder) {
+                        Get-ChildItem $extractedFolder | Move-Item -Destination . -Force
+                        Remove-Item $extractedFolder -Recurse -Force
+                    }
+                    Remove-Item $zipFile -Force
+                }
+                catch {
+                    Write-ColorOutput "ZIP extraction failed, installing Git and cloning..." $Yellow
+                    Remove-Item $zipFile -Force -ErrorAction SilentlyContinue
+                    
+                    if (Install-Git -Quick $Quick) {
+                        try {
+                            # Go back to parent directory and remove failed folder
+                            Set-Location ..
+                            Remove-Item $repoPath -Recurse -Force -ErrorAction SilentlyContinue
+                            
+                            git clone https://github.com/shhossain/zip-browser.git $repoPath 2>$null
+                            Set-Location $repoPath
+                            Write-ColorOutput "Repository cloned successfully!" $Green
+                        }
+                        catch {
+                            Write-ColorOutput "❌ Failed to clone repository: $_" $Red
+                            exit 1
+                        }
+                    }
+                    else {
+                        Write-ColorOutput "❌ Failed to install Git. Please install Git or PowerShell 5.0+ manually." $Red
+                        exit 1
+                    }
+                }
+            }
         }
         Write-ColorOutput ""
     }
