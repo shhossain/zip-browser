@@ -1,0 +1,671 @@
+{% extends "base.html" %}
+
+{% block title %}{{ zip_name }} - ZIP Gallery Explorer{% endblock %}
+
+{% block content %}
+<div class="header">
+  <h2>
+    <span class="icon-folder"></span>
+    {{ zip_name }}
+  </h2>
+</div>
+
+<div class="path-info"><strong>Path:</strong> /{{ path }}</div>
+
+<div class="nav-links">
+  <a href="{{ url_for('main.zip_list') }}" class="back-link">
+    <span class="icon-file-archive"></span>
+    All ZIP Files
+  </a>
+  {% if path %}
+  <a href="{{ url_for('main.browse', zip_id=zip_id, path=path.rsplit('/', 1)[0], view=view_mode, sort=sort_by, order=sort_order, thumb_size=thumb_size) }}" class="back-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+    Go Up
+  </a>
+  {% endif %}
+  <a href="{{ url_for('main.search', zip_id=zip_id) }}" class="search-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    Search
+  </a>
+</div>
+
+<!-- Quick Search Bar -->
+<div class="quick-search-container">
+  <form method="GET" action="{{ url_for('main.search', zip_id=zip_id) }}" class="quick-search-form">
+    <input type="text" name="q" placeholder="Quick search in {{ zip_name }}..." class="quick-search-input">
+    <button type="submit" class="quick-search-button">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+    </button>
+  </form>
+</div>
+
+<!-- View Controls Accordion -->
+<div class="view-controls-accordion">
+  <div class="accordion-header" onclick="toggleAccordion()">
+    <span class="accordion-title">View Options</span>
+    <span class="accordion-arrow">⌄</span>
+  </div>
+  <div class="accordion-content" id="accordionContent">
+    <div class="view-controls">
+      <div class="view-mode-selector">
+        <label for="viewModeSelect">View:</label>
+        <select id="viewModeSelect" onchange="changeViewMode()">
+          <option value="thumbnail" {% if view_mode == 'thumbnail' %}selected{% endif %}>Grid</option>
+          <option value="details" {% if view_mode == 'details' %}selected{% endif %}>List</option>
+        </select>
+      </div>
+      
+      <div class="sort-controls">
+        <label for="sortSelect">Sort:</label>
+        <select id="sortSelect" onchange="changeSortOptions()">
+          <option value="name" {% if sort_by == 'name' %}selected{% endif %}>Name</option>
+          <option value="type" {% if sort_by == 'type' %}selected{% endif %}>Type</option>
+          <option value="date" {% if sort_by == 'date' %}selected{% endif %}>Date</option>
+        </select>
+        <select id="orderSelect" onchange="changeSortOptions()">
+          <option value="asc" {% if sort_order == 'asc' %}selected{% endif %}>↑ Ascending</option>
+          <option value="desc" {% if sort_order == 'desc' %}selected{% endif %}>↓ Descending</option>
+        </select>
+      </div>
+      
+      {% if view_mode == 'thumbnail' %}
+      <div class="thumb-size-selector">
+        <label for="thumbSizeSelect">Size:</label>
+        <select id="thumbSizeSelect" onchange="changeThumbSize()">
+          <option value="80" {% if thumb_size == 80 %}selected{% endif %}>Small</option>
+          <option value="100" {% if thumb_size == 100 %}selected{% endif %}>Medium</option>
+          <option value="150" {% if thumb_size == 150 %}selected{% endif %}>Large</option>
+          <option value="200" {% if thumb_size == 200 %}selected{% endif %}>X-Large</option>
+          <option value="250" {% if thumb_size == 250 %}selected{% endif %}>XX-Large</option>
+        </select>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- File Explorer Content -->
+{% if view_mode == 'thumbnail' %}
+  <div class="explorer-grid size-{{ thumb_size }}">
+    {% for item in items %}
+      {% if item.is_folder %}
+        <div class="explorer-item folder-item" onclick="navigateToFolder('{{ item.name }}')">
+          {% if item.preview_image %}
+            <img class="item-thumbnail" src="{{ url_for('main.thumb', zip_id=zip_id, path=item.preview_image, size=thumb_size) }}" alt="Folder preview" loading="lazy" />
+          {% else %}
+            <div class="folder-placeholder">
+              <span class="icon-folder"></span>
+            </div>
+          {% endif %}
+          <div class="item-name" title="{{ item.name }}">{{ item.name }}</div>
+        </div>
+      {% elif item.is_image %}
+        <div class="explorer-item image-item" onclick="openViewer('{{ item.name }}')">
+          <img class="item-thumbnail" src="{{ url_for('main.thumb', zip_id=zip_id, path=item.preview_image, size=thumb_size) }}" alt="{{ item.name }}" loading="lazy" />
+          <div class="item-name" title="{{ item.name }}">{{ item.name }}</div>
+        </div>
+      {% else %}
+        <a href="{{ url_for('main.view_file', zip_id=zip_id, path=(path + '/' + item.name) if path else item.name) }}" class="explorer-item file-item">
+          <div class="file-placeholder">
+            <span class="{{ get_file_icon(item.extension) }}"></span>
+          </div>
+          <div class="item-name" title="{{ item.name }}">{{ item.name }}</div>
+        </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="explorer-list">
+    <div class="list-header">
+      <div class="col-name" onclick="sortBy('name')">
+        Name
+        {% if sort_by == 'name' %}
+          <span class="sort-icon">{{ '↑' if sort_order == 'asc' else '↓' }}</span>
+        {% endif %}
+      </div>
+      <div class="col-type" onclick="sortBy('type')">
+        Type
+        {% if sort_by == 'type' %}
+          <span class="sort-icon">{{ '↑' if sort_order == 'asc' else '↓' }}</span>
+        {% endif %}
+      </div>
+      <div class="col-size" onclick="sortBy('date')">
+        Date
+        {% if sort_by == 'date' %}
+          <span class="sort-icon">{{ '↑' if sort_order == 'asc' else '↓' }}</span>
+        {% endif %}
+      </div>
+      <div></div>
+    </div>
+    {% for item in items %}
+      {% if item.is_folder %}
+        <div class="explorer-item-row folder-row" onclick="navigateToFolder('{{ item.name }}')">
+          <div class="col-name">
+            {% if item.preview_image %}
+              <img class="row-thumbnail" src="{{ url_for('main.thumb', zip_id=zip_id, path=item.preview_image, size=40) }}" alt="Folder preview" loading="lazy" />
+            {% else %}
+              <span class="row-icon"><span class="icon-folder"></span></span>
+            {% endif %}
+            <span class="item-name">{{ item.name }}</span>
+          </div>
+          <div class="col-type">Folder</div>
+          <div class="col-size">-</div>
+          <div></div>
+        </div>
+      {% elif item.is_image %}
+        <div class="explorer-item-row image-row" onclick="openViewer('{{ item.name }}')">
+          <div class="col-name">
+            <img class="row-thumbnail" src="{{ url_for('main.thumb', zip_id=zip_id, path=item.preview_image, size=40) }}" alt="{{ item.name }}" loading="lazy" />
+            <span class="item-name">{{ item.name }}</span>
+          </div>
+          <div class="col-type">Image</div>
+          <div class="col-size">-</div>
+          <div></div>
+        </div>
+      {% else %}
+        <a href="{{ url_for('main.view_file', zip_id=zip_id, path=(path + '/' + item.name) if path else item.name) }}" target="_blank" class="explorer-item-row file-row">
+          <div class="col-name">
+            <span class="row-icon"><span class="{{ get_file_icon(item.extension) }}"></span></span>
+            <span class="item-name">{{ item.name }}</span>
+          </div>
+          <div class="col-type">{{ item.extension.upper() or 'File' }}</div>
+          <div class="col-size">-</div>
+          <div></div>
+        </a>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if not items %}
+  <div class="no-content">
+    <h3>This folder is empty</h3>
+    <p>No files or folders found in this location.</p>
+  </div>
+{% endif %}
+
+<!-- Bottom spacing -->
+<div class="bottom-spacing"></div>
+{% endblock %}
+
+{% block body_content %}
+{{ super() }}
+
+<div id="viewer">
+  <button class="nav prev" onclick="prevImage()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+    </svg>
+  </button>
+  <div class="zoom-container" id="zoomContainer">
+    <img id="viewer-img" />
+  </div>
+  <button class="nav next" onclick="nextImage()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+    </svg>
+  </button>
+  <button class="nav close" onclick="closeViewer()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+    </svg>
+  </button>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let images = [],
+    currentIndex = -1;
+  const dirPath = "{{ path }}";
+  
+  // Zoom and pan variables
+  let scale = 1;
+  let translateX = 0;
+  let translateY = 0;
+  let isDragging = false;
+  let startX = 0;
+  let startY = 0;
+  let lastX = 0;
+  let lastY = 0;
+  
+  // Touch variables for pinch zoom
+  let isZooming = false;
+  let lastDistance = 0;
+  let initialScale = 1;
+
+      function changeViewMode() {
+        const viewModeSelect = document.getElementById("viewModeSelect");
+        const newViewMode = viewModeSelect.value;
+        const currentUrl = new URL(window.location);
+        
+        currentUrl.searchParams.set("view", newViewMode);
+        window.location.href = currentUrl.toString();
+      }
+
+      function toggleAccordion() {
+        const content = document.getElementById("accordionContent");
+        const arrow = document.querySelector(".accordion-arrow");
+        
+        if (content.style.display === "none" || content.style.display === "") {
+          content.style.display = "block";
+          arrow.textContent = "⌃";
+        } else {
+          content.style.display = "none";
+          arrow.textContent = "⌄";
+        }
+      }
+
+      function changeThumbSize() {
+        const thumbSizeSelect = document.getElementById("thumbSizeSelect");
+        const newThumbSize = thumbSizeSelect.value;
+        const currentUrl = new URL(window.location);
+        
+        currentUrl.searchParams.set("thumb_size", newThumbSize);
+        window.location.href = currentUrl.toString();
+      }
+
+      function changeSortOptions() {
+        const sortSelect = document.getElementById("sortSelect");
+        const orderSelect = document.getElementById("orderSelect");
+        const currentUrl = new URL(window.location);
+        
+        currentUrl.searchParams.set("sort", sortSelect.value);
+        currentUrl.searchParams.set("order", orderSelect.value);
+        window.location.href = currentUrl.toString();
+      }
+
+      function sortBy(column) {
+        const currentUrl = new URL(window.location);
+        const currentSort = currentUrl.searchParams.get("sort");
+        const currentOrder = currentUrl.searchParams.get("order");
+        
+        let newOrder = "asc";
+        if (currentSort === column && currentOrder === "asc") {
+          newOrder = "desc";
+        }
+        
+        currentUrl.searchParams.set("sort", column);
+        currentUrl.searchParams.set("order", newOrder);
+        window.location.href = currentUrl.toString();
+      }
+
+      function navigateToFolder(folderName) {
+        const currentUrl = new URL(window.location);
+        const currentPath = "{{ path }}";
+        const newPath = currentPath ? currentPath + "/" + folderName : folderName;
+        
+        // Preserve current view settings
+        const params = new URLSearchParams();
+        params.set("view", "{{ view_mode }}");
+        params.set("sort", "{{ sort_by }}");
+        params.set("order", "{{ sort_order }}");
+        params.set("thumb_size", "{{ thumb_size }}");
+        
+        // Navigate to the folder
+        window.location.href = "{{ url_for('main.browse', zip_id=zip_id, path='') }}" + newPath + "?" + params.toString();
+      }
+
+
+
+      function openViewer(filename) {
+        const dirPath = "{{ path }}";
+        fetch("{{ url_for('main.list_images', zip_id=zip_id, dir_path='') }}" + dirPath)
+          .then((res) => res.json())
+          .then((imgList) => {
+            images = imgList;
+            currentIndex = images.indexOf(filename);
+            if (currentIndex !== -1) {
+              document.getElementById("viewer").style.display = "flex";
+              document.body.style.overflow = "hidden";
+              showImage();
+            }
+          })
+          .catch((error) => {
+            console.error("Error loading images:", error);
+          });
+      }
+
+      function showImage() {
+        const viewerImg = document.getElementById("viewer-img");
+        const dirPath = "{{ path }}";
+        const fullPath = "{{ url_for('main.view_file', zip_id=zip_id, path='') }}" + (dirPath ? dirPath + "/" : "") + images[currentIndex];
+        viewerImg.src = fullPath;
+        
+        // Reset zoom and pan when showing new image
+        resetZoom();
+        
+        // Update navigation button states
+        updateNavigationButtons();
+        
+        viewerImg.onload = function() {
+          this.style.opacity = "1";
+        };
+        viewerImg.style.opacity = "0.7";
+      }
+      
+      function updateNavigationButtons() {
+        const prevBtn = document.querySelector('.nav.prev');
+        const nextBtn = document.querySelector('.nav.next');
+        
+        if (prevBtn) {
+          prevBtn.disabled = currentIndex <= 0;
+          prevBtn.style.opacity = currentIndex <= 0 ? '0.3' : '1';
+        }
+        
+        if (nextBtn) {
+          nextBtn.disabled = currentIndex >= images.length - 1;
+          nextBtn.style.opacity = currentIndex >= images.length - 1 ? '0.3' : '1';
+        }
+      }
+      
+      function resetZoom() {
+        scale = 1;
+        translateX = 0;
+        translateY = 0;
+        updateImageTransform();
+      }
+      
+      function updateImageTransform() {
+        const viewerImg = document.getElementById("viewer-img");
+        viewerImg.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+      }
+      
+      function constrainPan() {
+        const viewerImg = document.getElementById("viewer-img");
+        const container = document.getElementById("zoomContainer");
+        
+        if (scale <= 1) {
+          translateX = 0;
+          translateY = 0;
+          return;
+        }
+        
+        const imgRect = viewerImg.getBoundingClientRect();
+        const containerRect = container.getBoundingClientRect();
+        
+        const scaledWidth = imgRect.width * scale;
+        const scaledHeight = imgRect.height * scale;
+        
+        const maxTranslateX = Math.max(0, (scaledWidth - containerRect.width) / 2);
+        const maxTranslateY = Math.max(0, (scaledHeight - containerRect.height) / 2);
+        
+        translateX = Math.max(-maxTranslateX, Math.min(maxTranslateX, translateX));
+        translateY = Math.max(-maxTranslateY, Math.min(maxTranslateY, translateY));
+      }
+
+      function prevImage() {
+        if (currentIndex > 0) {
+          currentIndex--;
+          showImage();
+        }
+      }
+
+      function nextImage() {
+        if (currentIndex < images.length - 1) {
+          currentIndex++;
+          showImage();
+        }
+      }
+
+      function closeViewer() {
+        document.getElementById("viewer").style.display = "none";
+        document.body.style.overflow = "auto";
+        resetZoom(); // Reset zoom when closing
+        
+        // Reset navigation button states
+        const prevBtn = document.querySelector('.nav.prev');
+        const nextBtn = document.querySelector('.nav.next');
+        if (prevBtn) {
+          prevBtn.disabled = false;
+          prevBtn.style.opacity = '1';
+        }
+        if (nextBtn) {
+          nextBtn.disabled = false;
+          nextBtn.style.opacity = '1';
+        }
+      }
+      
+      // Mouse wheel zoom support
+      function handleMouseWheel(e) {
+        if (document.getElementById("viewer").style.display === "flex") {
+          e.preventDefault();
+          
+          const delta = e.deltaY > 0 ? -0.1 : 0.1;
+          const newScale = Math.max(0.5, Math.min(5, scale + delta));
+          
+          if (newScale !== scale) {
+            const rect = document.getElementById("viewer-img").getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const mouseX = e.clientX - centerX;
+            const mouseY = e.clientY - centerY;
+            
+            const scaleRatio = newScale / scale;
+            translateX = translateX * scaleRatio + mouseX * (1 - scaleRatio);
+            translateY = translateY * scaleRatio + mouseY * (1 - scaleRatio);
+            
+            scale = newScale;
+            constrainPan();
+            updateImageTransform();
+          }
+        }
+      }
+      
+      // Mouse drag support for panning
+      function handleMouseDown(e) {
+        if (e.target.id === "viewer-img" && scale > 1) {
+          isDragging = true;
+          startX = e.clientX - translateX;
+          startY = e.clientY - translateY;
+          document.getElementById("zoomContainer").classList.add("dragging");
+          e.preventDefault();
+        }
+      }
+      
+      function handleMouseMove(e) {
+        if (isDragging) {
+          translateX = e.clientX - startX;
+          translateY = e.clientY - startY;
+          constrainPan();
+          updateImageTransform();
+          e.preventDefault();
+        }
+      }
+      
+      function handleMouseUp(e) {
+        if (isDragging) {
+          isDragging = false;
+          document.getElementById("zoomContainer").classList.remove("dragging");
+        }
+      }
+      
+      // Touch distance calculation for pinch zoom
+      function getDistance(touches) {
+        const dx = touches[0].clientX - touches[1].clientX;
+        const dy = touches[0].clientY - touches[1].clientY;
+        return Math.sqrt(dx * dx + dy * dy);
+      }
+      
+      // Touch center calculation
+      function getTouchCenter(touches) {
+        return {
+          x: (touches[0].clientX + touches[1].clientX) / 2,
+          y: (touches[0].clientY + touches[1].clientY) / 2
+        };
+      }
+      
+      // Double tap to reset zoom
+      let lastTapTime = 0;
+      function handleImageDoubleClick(e) {
+        const currentTime = new Date().getTime();
+        const tapGap = currentTime - lastTapTime;
+        
+        if (tapGap < 300 && tapGap > 0) {
+          // Double tap detected
+          e.preventDefault();
+          e.stopPropagation();
+          
+          if (scale > 1) {
+            resetZoom();
+          } else {
+            // Zoom in to 2x at the tap location
+            const rect = e.target.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const tapX = e.clientX - centerX;
+            const tapY = e.clientY - centerY;
+            
+            scale = 2;
+            translateX = -tapX;
+            translateY = -tapY;
+            constrainPan();
+            updateImageTransform();
+          }
+        }
+        
+        lastTapTime = currentTime;
+      }
+
+      // Keyboard navigation
+      document.addEventListener("keydown", function(e) {
+        if (document.getElementById("viewer").style.display === "flex") {
+          if (e.key === "ArrowLeft" && currentIndex > 0) {
+            prevImage();
+          } else if (e.key === "ArrowRight" && currentIndex < images.length - 1) {
+            nextImage();
+          } else if (e.key === "Escape") {
+            closeViewer();
+          }
+        }
+      });
+
+      // Close viewer when clicking outside the image
+      document.getElementById("viewer").addEventListener("click", function(e) {
+        if (e.target === this) {
+          closeViewer();
+        }
+      });
+
+      // Add mouse wheel support
+      document.addEventListener("wheel", handleMouseWheel, { passive: false });
+      
+      // Add mouse drag support
+      document.addEventListener("mousedown", handleMouseDown);
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      
+      // Add double-click/tap to reset zoom
+      document.getElementById("viewer-img").addEventListener("click", handleImageDoubleClick);
+      
+      // Prevent context menu on image
+      document.getElementById("viewer-img").addEventListener("contextmenu", function(e) {
+        e.preventDefault();
+      });
+
+      // Touch/swipe support with pinch zoom
+      let touchStartX = 0;
+      let touchEndX = 0;
+      const minSwipeDistance = 50;
+
+      function checkDirection() {
+        const swipeDistance = touchEndX - touchStartX;
+        
+        if (Math.abs(swipeDistance) > minSwipeDistance) {
+          if (swipeDistance > 0 && currentIndex > 0) {
+            prevImage();
+          } else if (swipeDistance < 0 && currentIndex < images.length - 1) {
+            nextImage();
+          }
+        }
+      }
+
+      document.getElementById("viewer").addEventListener("touchstart", function(e) {
+        if (document.getElementById("viewer").style.display === "flex") {
+          if (e.touches.length === 1 && !isZooming) {
+            // Single touch - prepare for swipe
+            touchStartX = e.touches[0].clientX;
+            
+            // If zoomed in, enable panning
+            if (scale > 1) {
+              isDragging = true;
+              startX = e.touches[0].clientX - translateX;
+              startY = e.touches[0].clientY - translateY;
+            }
+          } else if (e.touches.length === 2) {
+            // Two finger touch - pinch zoom
+            isZooming = true;
+            isDragging = false;
+            lastDistance = getDistance(e.touches);
+            initialScale = scale;
+            
+            const center = getTouchCenter(e.touches);
+            const imgRect = document.getElementById("viewer-img").getBoundingClientRect();
+            lastX = center.x - imgRect.left - imgRect.width / 2;
+            lastY = center.y - imgRect.top - imgRect.height / 2;
+          }
+        }
+      });
+
+      document.getElementById("viewer").addEventListener("touchmove", function(e) {
+        if (document.getElementById("viewer").style.display === "flex") {
+          e.preventDefault();
+          
+          if (e.touches.length === 1 && isDragging && !isZooming) {
+            // Single finger drag for panning when zoomed
+            translateX = e.touches[0].clientX - startX;
+            translateY = e.touches[0].clientY - startY;
+            constrainPan();
+            updateImageTransform();
+          } else if (e.touches.length === 2 && isZooming) {
+            // Two finger pinch zoom
+            const currentDistance = getDistance(e.touches);
+            const scaleChange = currentDistance / lastDistance;
+            const newScale = Math.max(0.5, Math.min(5, scale * scaleChange));
+            
+            if (newScale !== scale) {
+              const center = getTouchCenter(e.touches);
+              const imgRect = document.getElementById("viewer-img").getBoundingClientRect();
+              const centerX = center.x - imgRect.left - imgRect.width / 2;
+              const centerY = center.y - imgRect.top - imgRect.height / 2;
+              
+              const scaleRatio = newScale / scale;
+              translateX = translateX * scaleRatio + centerX * (1 - scaleRatio);
+              translateY = translateY * scaleRatio + centerY * (1 - scaleRatio);
+              
+              scale = newScale;
+              lastDistance = currentDistance;
+              constrainPan();
+              updateImageTransform();
+            }
+          }
+        }
+      });
+
+      document.getElementById("viewer").addEventListener("touchend", function(e) {
+        if (document.getElementById("viewer").style.display === "flex") {
+          if (e.touches.length === 0) {
+            // All fingers lifted
+            if (!isZooming && !isDragging) {
+              // Only check for swipe if we weren't zooming or dragging
+              touchEndX = e.changedTouches[0].clientX;
+              checkDirection();
+            }
+            isZooming = false;
+            isDragging = false;
+          } else if (e.touches.length === 1) {
+            // One finger remaining after two-finger gesture
+            isZooming = false;
+            if (scale > 1) {
+              isDragging = true;
+              startX = e.touches[0].clientX - translateX;
+              startY = e.touches[0].clientY - translateY;
+            }
+          }
+        }
+      });
+</script>
+{% endblock %}

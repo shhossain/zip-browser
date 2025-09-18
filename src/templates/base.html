@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>{% block title %}ZIP Gallery Explorer{% endblock %}</title>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    {% block body_class %}{% endblock %}
+    
+    {% block body_content %}
+    <div class="container">
+        {% block navigation %}
+        {% if current_user.is_authenticated %}
+        <!-- Main Navigation -->
+        <nav class="main-nav">
+            <div class="nav-left">
+                <a href="{{ url_for('main.zip_list') }}" class="nav-home">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
+                    </svg>
+                    <span class="nav-text">ZIP Gallery Explorer</span>
+                </a>
+            </div>
+        </nav>
+        {% endif %}
+        {% endblock %}
+
+        {% block user_info %}
+        {% if current_user.is_authenticated %}
+        <!-- User info and logout -->
+        <div class="user-info">
+            <span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+              </svg>
+              Logged in as: {{ current_user.username }}
+            </span>
+            <a href="{{ url_for('main.logout') }}" class="logout-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.59L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
+              </svg>
+              Logout
+            </a>
+        </div>
+        {% endif %}
+        {% endblock %}
+        
+        {% if get_flashed_messages() %}
+        <div class="flash-messages">
+          {% for message in get_flashed_messages() %}
+            <div class="flash-message">{{ message }}</div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </div>
+    {% endblock %}
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

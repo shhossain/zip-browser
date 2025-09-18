@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Search Results - {{ zip_name }} - ZIP Gallery Explorer{% endblock %}
+
+{% block content %}
+<div class="header">
+  <h2>
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+    </svg>
+    Search Results in {{ zip_name }}
+  </h2>
+</div>
+
+<div class="nav-links">
+  <a href="{{ url_for('main.zip_list') }}" class="back-link">
+    <span class="icon-file-archive"></span>
+    All ZIP Files
+  </a>
+  <a href="{{ url_for('main.browse', zip_id=zip_id) }}" class="back-link">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+    </svg>
+    Back to Browse
+  </a>
+</div>
+
+<!-- Search Form -->
+<div class="controls">
+  <form method="GET" action="{{ url_for('main.search', zip_id=zip_id) }}" class="search-form">
+    <input type="text" name="q" value="{{ query }}" placeholder="Search files and folders..." class="search-input" autofocus>
+    <button type="submit" class="search-btn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+      Search
+    </button>
+  </form>
+  
+  <div class="search-filters">
+    <label>
+      <input type="radio" name="type" value="all" {% if search_type == 'all' %}checked{% endif %}> All
+    </label>
+    <label>
+      <input type="radio" name="type" value="images" {% if search_type == 'images' %}checked{% endif %}> Images
+    </label>
+    <label>
+      <input type="radio" name="type" value="folders" {% if search_type == 'folders' %}checked{% endif %}> Folders
+    </label>
+    <label>
+      <input type="radio" name="type" value="files" {% if search_type == 'files' %}checked{% endif %}> Files
+    </label>
+  </div>
+</div>
+
+<!-- Search Results -->
+{% if query %}
+  <div class="search-info">
+    <p><strong>{{ total_results }}</strong> result{% if total_results != 1 %}s{% endif %} found for "<strong>{{ query }}</strong>"</p>
+  </div>
+
+  {% if items %}
+    <!-- Pagination Info -->
+    {% if total_pages > 1 %}
+    <div class="pagination-info">
+      Showing results {{ (page - 1) * per_page + 1 }} - {{ ((page - 1) * per_page + items|length) }} of {{ total_results }}
+    </div>
+    {% endif %}
+
+    <!-- Results List -->
+    <div class="search-results-list">
+      {% for item in items %}
+        <div class="search-result-item {% if item.is_folder %}folder-result{% elif item.is_image %}image-result{% else %}file-result{% endif %}">
+          <div class="result-thumbnail">
+            {% if item.is_folder %}
+              <span class="result-icon">📁</span>
+            {% elif item.is_image %}
+              <img src="{{ url_for('main.thumb', zip_id=zip_id, path=item.path, size=60) }}" alt="{{ item.name }}" class="result-image" />
+            {% else %}
+              <span class="result-icon">{{ get_file_icon(item.extension) }}</span>
+            {% endif %}
+          </div>
+          
+          <div class="result-details">
+            <div class="result-name">
+              {% if item.is_folder %}
+                <a href="{{ url_for('main.browse', zip_id=zip_id, path=item.path) }}" class="result-link">{{ item.name }}</a>
+              {% elif item.is_image %}
+                <a href="javascript:void(0)" onclick="openImageFromSearch('{{ item.path }}')" class="result-link">{{ item.name }}</a>
+              {% else %}
+                <a href="{{ url_for('main.view_file', zip_id=zip_id, path=item.path) }}" class="result-link" target="_blank">{{ item.name }}</a>
+              {% endif %}
+            </div>
+            <div class="result-path">📂 {{ item.directory }}</div>
+            <div class="result-type">
+              {% if item.is_folder %}
+                📁 Folder
+              {% elif item.is_image %}
+                🖼️ Image
+              {% else %}
+                📄 {{ item.extension.upper() or 'File' }}
+              {% endif %}
+            </div>
+          </div>
+          
+          <div class="result-actions">
+            {% if item.is_folder %}
+              <a href="{{ url_for('main.browse', zip_id=zip_id, path=item.path) }}" class="action-btn">📂 Open</a>
+            {% elif item.is_image %}
+              <button onclick="openImageFromSearch('{{ item.path }}')" class="action-btn">👁️ View</button>
+            {% else %}
+              <a href="{{ url_for('main.view_file', zip_id=zip_id, path=item.path) }}" class="action-btn" target="_blank">📄 Open</a>
+            {% endif %}
+            {% if not item.is_folder %}
+              <a href="{{ url_for('main.browse', zip_id=zip_id, path=item.directory) }}" class="action-btn secondary">📁 Go to Folder</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div class="pagination">
+      {% if page > 1 %}
+        <a href="{{ url_for('main.search', zip_id=zip_id, q=query, type=search_type, page=page-1, per_page=per_page) }}" class="pagination-btn">« Previous</a>
+      {% endif %}
+      
+      {% for p in range(1, total_pages + 1) %}
+        {% if p == page %}
+          <span class="pagination-btn current">{{ p }}</span>
+        {% elif p <= 3 or p >= total_pages - 2 or (p >= page - 2 and p <= page + 2) %}
+          <a href="{{ url_for('main.search', zip_id=zip_id, q=query, type=search_type, page=p, per_page=per_page) }}" class="pagination-btn">{{ p }}</a>
+        {% elif p == 4 and page > 6 %}
+          <span class="pagination-dots">...</span>
+        {% elif p == total_pages - 3 and page < total_pages - 5 %}
+          <span class="pagination-dots">...</span>
+        {% endif %}
+      {% endfor %}
+      
+      {% if page < total_pages %}
+        <a href="{{ url_for('main.search', zip_id=zip_id, q=query, type=search_type, page=page+1, per_page=per_page) }}" class="pagination-btn">Next »</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  {% else %}
+    <div class="no-results">
+      <p>No results found for "<strong>{{ query }}</strong>"</p>
+      <p>Try a different search term or change your filter settings.</p>
+    </div>
+  {% endif %}
+
+{% else %}
+  <div class="search-placeholder">
+    <p>Enter a search term to find files and folders in {{ zip_name }}.</p>
+  </div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openImageFromSearch(imagePath) {
+    // This function should integrate with your existing image viewer
+    // For now, we'll just open it in a new tab
+    window.open("{{ url_for('main.view_file', zip_id=zip_id, path='') }}" + imagePath, '_blank');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,4 @@
+# Sample ZIP file URLs for testing
+https://getsamplefiles.com/download/zip/sample-1.zip
+# You can add more URLs here, one per line
+# Lines starting with # are ignored

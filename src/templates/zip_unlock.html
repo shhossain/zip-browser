@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Unlock ZIP - ZIP Gallery Explorer{% endblock %}
+
+{% block content %}
+<div class="unlock-container">
+    <div class="unlock-box">
+        <h2>🔒 Password Required</h2>
+        <p class="unlock-subtitle">{{ zip_info.name }} is password protected</p>
+        
+        <div id="error-message" class="error-message" style="display: none;"></div>
+        
+    <form id="unlock-form" class="unlock-form">
+            <div class="form-group">
+                <label for="password">🔑 ZIP Password:</label>
+                <input type="password" id="password" name="password" required autofocus>
+            </div>
+            
+            <div class="form-buttons">
+                <button type="submit" class="unlock-btn">Unlock ZIP</button>
+                <a href="{{ url_for('main.zip_list') }}" class="back-btn">⬅️ Back to ZIP List</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+        document.getElementById('unlock-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('error-message');
+            const submitBtn = document.querySelector('.unlock-btn');
+            
+            // Show loading state
+            submitBtn.textContent = 'Unlocking...';
+            submitBtn.disabled = true;
+            errorDiv.style.display = 'none';
+            
+            const csrfToken = '{{ csrf_token() }}';
+            fetch('{{ url_for("main.unlock_zip", zip_id=zip_id) }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: 'password=' + encodeURIComponent(password) + '&csrf_token=' + encodeURIComponent(csrfToken)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Redirect to browse the ZIP
+                    window.location.href = '{{ url_for("main.browse", zip_id=zip_id) }}';
+                } else {
+                    // Show error
+                    errorDiv.textContent = data.error || 'Invalid password';
+                    errorDiv.style.display = 'block';
+                    submitBtn.textContent = 'Unlock ZIP';
+                    submitBtn.disabled = false;
+                    document.getElementById('password').value = '';
+                    document.getElementById('password').focus();
+                }
+            })
+            .catch(error => {
+                errorDiv.textContent = 'An error occurred. Please try again.';
+                errorDiv.style.display = 'block';
+                submitBtn.textContent = 'Unlock ZIP';
+                submitBtn.disabled = false;
+            });
+        });
+</script>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+        .unlock-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 60vh;
+        }
+        
+        .unlock-box {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+        
+        .unlock-box h2 {
+            text-align: center;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .unlock-subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .unlock-form .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .unlock-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .unlock-form input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        
+        .form-buttons {
+            display: flex;
+            gap: 10px;
+            flex-direction: column;
+        }
+        
+        .unlock-btn {
+            background: #007bff;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .unlock-btn:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        
+        .unlock-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            padding: 12px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            text-align: center;
+            transition: background 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: #545b62;
+        }
+        
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border: 1px solid #f5c6cb;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+</style>
+{% endblock %}

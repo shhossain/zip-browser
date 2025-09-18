@@ -1,0 +1,27 @@
+[project]
+name = "zip-file-viewer"
+version = "0.1.0"
+description = "A modern Flask web application for browsing and viewing files inside ZIP archives with multi-user authentication"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "flask>=3.1.2",
+    "flask-login>=0.6.3",
+    "flask-wtf>=1.2.2",
+    "pillow>=11.3.0",
+    "pyzipper>=0.3.6",
+    "pyziper>=0.3",
+    "remotezip>=0.12.3",
+    "tabulate>=0.9.0",
+]
+
+[project.scripts]
+zip-viewer = "cli_entry:main"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["cli_entry", "main", "manage_users"]
+packages = ["src"]

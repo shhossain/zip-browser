@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+
+{% block title %}ZIP Files - ZIP Gallery Explorer{% endblock %}
+
+{% block content %}
+<div class="header">
+  <h2>
+    <span class="icon-file-archive"></span>
+    Available ZIP Files
+  </h2>
+</div>
+
+{% if zip_files %}
+    <div class="zip-files">
+        {% for zip_id, zip_info in zip_files.items() %}
+            <div class="zip-file-card">
+                <div class="zip-file-name">
+                    <span class="icon-file-archive"></span>
+                    {{ zip_info.name }}
+                </div>
+                <div class="zip-file-info">
+                    <div>
+                      {% if zip_info.is_remote %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="color: #3b82f6;">
+                          <path d="M16.36,14C16.44,13.34 16.5,12.68 16.5,12C16.5,11.32 16.44,10.66 16.36,10H19.74C19.9,10.64 20,11.31 20,12C20,12.69 19.9,13.36 19.74,14M14.59,19.56C15.19,18.45 15.65,17.25 15.97,16H18.92C17.96,17.65 16.43,18.93 14.59,19.56M14.34,14H9.66C9.56,13.34 9.5,12.68 9.5,12C9.5,11.32 9.56,10.65 9.66,10H14.34C14.43,10.65 14.5,11.32 14.5,12C14.5,12.68 14.43,13.34 14.34,14M12,19.96C11.17,18.76 10.5,17.43 10.09,16H13.91C13.5,17.43 12.83,18.76 12,19.96M8,8H5.08C6.03,6.34 7.57,5.06 9.4,4.44C8.8,5.55 8.35,6.75 8,8M5.08,16H8C8.35,17.25 8.8,18.45 9.4,19.56C7.57,18.93 6.03,17.65 5.08,16M4.26,14C4.1,13.36 4,12.69 4,12C4,11.31 4.1,10.64 4.26,10H7.64C7.56,10.66 7.5,11.32 7.5,12C7.5,12.68 7.56,13.34 7.64,14M12,4.03C12.83,5.23 13.5,6.57 13.91,8H10.09C10.5,6.57 11.17,5.23 12,4.03M18.92,8H15.97C15.65,6.75 15.19,5.55 14.59,4.44C16.43,5.07 17.96,6.34 18.92,8M12,2C6.47,2 2,6.5 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2Z"/>
+                        </svg>
+                        Remote: {{ zip_info.path }}
+                      {% else %}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
+                        </svg>
+                        {{ zip_info.path }}
+                      {% endif %}
+                    </div>
+                    {% if zip_info.requires_password %}
+                      <div style="color: #f59e0b;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12,17A2,2 0 0,0 14,15C14,13.89 13.1,13 12,13A2,2 0 0,0 10,15A2,2 0 0,0 12,17M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10C4,8.89 4.9,8 6,8H7V6A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18M12,3A3,3 0 0,0 9,6V8H15V6A3,3 0 0,0 12,3Z"/>
+                        </svg>
+                        Password Protected
+                      </div>
+                    {% else %}
+                      <div style="color: #10b981;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M18,8A2,2 0 0,1 20,10V20A2,2 0 0,1 18,22H6A2,2 0 0,1 4,20V10A2,2 0 0,1 6,8H15V6A3,3 0 0,0 12,3A3,3 0 0,0 9,6H7A5,5 0 0,1 12,1A5,5 0 0,1 17,6V8H18Z"/>
+                        </svg>
+                        No Password Required
+                      </div>
+                    {% endif %}
+                </div>
+                <div class="zip-actions">
+                    <a href="{{ url_for('main.browse', zip_id=zip_id) }}" class="btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M10,4H4C2.89,4 2,4.89 2,6V18A2,2 0 0,0 4,20H20A2,2 0 0,0 22,18V8C22,6.89 21.1,6 20,6H12L10,4Z"/>
+                        </svg>
+                        Browse
+                    </a>
+                    <a href="{{ url_for('main.search', zip_id=zip_id) }}" class="btn-primary">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                        </svg>
+                        Search
+                    </a>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <h3>No ZIP Files Found</h3>
+        <p>No ZIP files were found in the specified directory.</p>
+    </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+        .zip-files {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .zip-file-card {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        
+        .zip-file-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border-color: #d1d5db;
+        }
+        
+        .zip-file-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        
+        .zip-file-name .icon-file-archive::before {
+            content: "🗂️";
+            font-size: 1em;
+        }
+        
+        .zip-file-info {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex: 1;
+        }
+        
+        .zip-file-info > div {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.85em;
+            color: #6b7280;
+            padding: 6px 10px;
+            background: #f9fafb;
+            border-radius: 6px;
+        }
+        
+        .zip-file-info svg {
+            flex-shrink: 0;
+        }
+        
+        .zip-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: auto;
+        }
+        
+        .btn-primary {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 8px 12px;
+            background: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn-primary:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+            color: white;
+            text-decoration: none;
+        }
+        
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #6b7280;
+        }
+        
+        .empty-state h3 {
+            color: #374151;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+        
+        .empty-state p {
+            margin: 0;
+            font-size: 0.9em;
+        }
+        
+        .header h2 {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #1f2937;
+            margin-bottom: 16px;
+        }
+        
+        .header .icon-file-archive::before {
+            content: "📁";
+            font-size: 1.2em;
+        }
+        
+        @media (max-width: 768px) {
+            .zip-files {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+            
+            .zip-file-card {
+                padding: 14px;
+            }
+            
+            .zip-actions {
+                flex-direction: column;
+                gap: 6px;
+            }
+        }
+</style>
+{% endblock %}
