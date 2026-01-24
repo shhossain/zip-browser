@@ -18,7 +18,7 @@
             
             <div class="form-buttons">
                 <button type="submit" class="unlock-btn">Unlock ZIP</button>
-                <a href="{{ url_for('main.zip_list') }}" class="back-btn">⬅️ Back to ZIP List</a>
+                <a href="{{ url_for('browse.zip_list') }}" class="back-btn">⬅️ Back to ZIP List</a>
             </div>
         </form>
     </div>
@@ -40,7 +40,7 @@
             errorDiv.style.display = 'none';
             
             const csrfToken = '{{ csrf_token() }}';
-            fetch('{{ url_for("main.unlock_zip", zip_id=zip_id) }}', {
+            fetch('{{ url_for("browse.unlock_zip", zip_id=zip_id) }}', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -52,7 +52,7 @@
             .then(data => {
                 if (data.success) {
                     // Redirect to browse the ZIP
-                    window.location.href = '{{ url_for("main.browse", zip_id=zip_id) }}';
+                    window.location.href = '{{ url_for("browse.browse", zip_id=zip_id) }}';
                 } else {
                     // Show error
                     errorDiv.textContent = data.error || 'Invalid password';

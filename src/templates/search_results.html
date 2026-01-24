@@ -3,116 +3,133 @@
 {% block title %}Search Results - {{ zip_name }} - ZIP Gallery Explorer{% endblock %}
 
 {% block content %}
-<div class="header">
-  <h2>
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-    </svg>
-    Search Results in {{ zip_name }}
-  </h2>
-</div>
+<!-- Breadcrumb Navigation -->
+<nav class="breadcrumb-nav" aria-label="Breadcrumb">
+  <ol class="breadcrumb">
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('browse.zip_list') }}" class="breadcrumb-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+        <span>Home</span>
+      </a>
+    </li>
+    <li class="breadcrumb-item">
+      <a href="{{ url_for('browse.browse', zip_id=zip_id) }}" class="breadcrumb-link">
+        <span class="icon-file-archive"></span>
+        <span>{{ zip_name }}</span>
+      </a>
+    </li>
+    <li class="breadcrumb-item active">
+      <span class="breadcrumb-current">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 4px;">
+          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
+        Search
+      </span>
+    </li>
+  </ol>
+</nav>
 
-<div class="nav-links">
-  <a href="{{ url_for('main.zip_list') }}" class="back-link">
-    <span class="icon-file-archive"></span>
-    All ZIP Files
-  </a>
-  <a href="{{ url_for('main.browse', zip_id=zip_id) }}" class="back-link">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-    </svg>
-    Back to Browse
-  </a>
-</div>
-
-<!-- Search Form -->
-<div class="controls">
-  <form method="GET" action="{{ url_for('main.search', zip_id=zip_id) }}" class="search-form">
-    <input type="text" name="q" value="{{ query }}" placeholder="Search files and folders..." class="search-input" autofocus>
-    <button type="submit" class="search-btn">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-      </svg>
-      Search
-    </button>
-  </form>
-  
-  <div class="search-filters">
-    <label>
-      <input type="radio" name="type" value="all" {% if search_type == 'all' %}checked{% endif %}> All
-    </label>
-    <label>
-      <input type="radio" name="type" value="images" {% if search_type == 'images' %}checked{% endif %}> Images
-    </label>
-    <label>
-      <input type="radio" name="type" value="folders" {% if search_type == 'folders' %}checked{% endif %}> Folders
-    </label>
-    <label>
-      <input type="radio" name="type" value="files" {% if search_type == 'files' %}checked{% endif %}> Files
-    </label>
+<!-- Action Bar -->
+<div class="action-bar">
+  <div class="action-bar-left">
+    <a href="{{ url_for('browse.browse', zip_id=zip_id) }}" class="action-btn" title="Back to browse">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+      <span class="action-btn-text">Back</span>
+    </a>
   </div>
+  <div class="action-bar-right">
+    <!-- Search Form -->
+    <form method="GET" action="{{ url_for('search.search', zip_id=zip_id) }}" class="search-form-inline">
+      <input type="text" name="q" value="{{ query }}" placeholder="Search files and folders..." class="search-input-modern" autofocus>
+      <input type="hidden" name="type" value="{{ search_type }}">
+      <button type="submit" class="search-btn-modern">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+        </svg>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <div class="toolbar-group">
+    <label class="toolbar-label">Filter:</label>
+    <div class="filter-pills">
+      <a href="{{ url_for('search.search', zip_id=zip_id, q=query, type='all') }}" class="filter-pill {% if search_type == 'all' %}active{% endif %}">All</a>
+      <a href="{{ url_for('search.search', zip_id=zip_id, q=query, type='images') }}" class="filter-pill {% if search_type == 'images' %}active{% endif %}">Images</a>
+      <a href="{{ url_for('search.search', zip_id=zip_id, q=query, type='videos') }}" class="filter-pill {% if search_type == 'videos' %}active{% endif %}">Videos</a>
+      <a href="{{ url_for('search.search', zip_id=zip_id, q=query, type='folders') }}" class="filter-pill {% if search_type == 'folders' %}active{% endif %}">Folders</a>
+      <a href="{{ url_for('search.search', zip_id=zip_id, q=query, type='files') }}" class="filter-pill {% if search_type == 'files' %}active{% endif %}">Files</a>
+    </div>
+  </div>
+  
+  {% if query %}
+  <div class="toolbar-info">
+    <span class="item-count">{{ total_results }} result{% if total_results != 1 %}s{% endif %}</span>
+  </div>
+  {% endif %}
 </div>
 
 <!-- Search Results -->
 {% if query %}
-  <div class="search-info">
-    <p><strong>{{ total_results }}</strong> result{% if total_results != 1 %}s{% endif %} found for "<strong>{{ query }}</strong>"</p>
-  </div>
-
   {% if items %}
     <!-- Pagination Info -->
     {% if total_pages > 1 %}
     <div class="pagination-info">
-      Showing results {{ (page - 1) * per_page + 1 }} - {{ ((page - 1) * per_page + items|length) }} of {{ total_results }}
+      Showing {{ (page - 1) * per_page + 1 }} - {{ ((page - 1) * per_page + items|length) }} of {{ total_results }}
     </div>
     {% endif %}
 
-    <!-- Results List -->
-    <div class="search-results-list">
+    <!-- Results Grid -->
+    <div class="search-results-grid">
       {% for item in items %}
-        <div class="search-result-item {% if item.is_folder %}folder-result{% elif item.is_image %}image-result{% else %}file-result{% endif %}">
-          <div class="result-thumbnail">
+        <div class="search-result-card {% if item.is_folder %}folder-card{% elif item.is_image %}image-card{% elif item.is_video %}video-card{% else %}file-card{% endif %}">
+          <div class="result-card-thumb" onclick="handleResultClick('{{ item.path }}', '{% if item.is_folder %}folder{% elif item.is_image %}image{% elif item.is_video %}video{% else %}file{% endif %}')">
             {% if item.is_folder %}
-              <span class="result-icon">📁</span>
+              <div class="result-icon-wrap folder-icon">
+                <span class="icon-folder"></span>
+              </div>
             {% elif item.is_image %}
-              <img src="{{ url_for('main.thumb', zip_id=zip_id, path=item.path, size=60) }}" alt="{{ item.name }}" class="result-image" />
+              <img src="{{ url_for('browse.thumb', zip_id=zip_id, path=item.path, size=150) }}" alt="{{ item.name }}" loading="lazy" />
+            {% elif item.is_video %}
+              <img src="{{ url_for('video.video_thumbnail', zip_id=zip_id, path=item.path) }}" alt="{{ item.name }}" loading="lazy" 
+                   onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+              <div class="result-icon-wrap video-icon" style="display: none;">
+                <span class="icon-file-video"></span>
+              </div>
+              <div class="video-badge">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              </div>
             {% else %}
-              <span class="result-icon">{{ get_file_icon(item.extension) }}</span>
+              <div class="result-icon-wrap file-icon">
+                <span class="{{ get_file_icon(item.extension) }}"></span>
+              </div>
             {% endif %}
           </div>
           
-          <div class="result-details">
-            <div class="result-name">
-              {% if item.is_folder %}
-                <a href="{{ url_for('main.browse', zip_id=zip_id, path=item.path) }}" class="result-link">{{ item.name }}</a>
-              {% elif item.is_image %}
-                <a href="javascript:void(0)" onclick="openImageFromSearch('{{ item.path }}')" class="result-link">{{ item.name }}</a>
-              {% else %}
-                <a href="{{ url_for('main.view_file', zip_id=zip_id, path=item.path) }}" class="result-link" target="_blank">{{ item.name }}</a>
-              {% endif %}
-            </div>
-            <div class="result-path">📂 {{ item.directory }}</div>
-            <div class="result-type">
-              {% if item.is_folder %}
-                📁 Folder
-              {% elif item.is_image %}
-                🖼️ Image
-              {% else %}
-                📄 {{ item.extension.upper() or 'File' }}
-              {% endif %}
+          <div class="result-card-info">
+            <div class="result-card-name" title="{{ item.name }}">{{ item.name }}</div>
+            <div class="result-card-path" title="{{ item.directory }}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="opacity: 0.6;"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+              {{ item.directory or '/' }}
             </div>
           </div>
           
-          <div class="result-actions">
+          <div class="result-card-actions">
             {% if item.is_folder %}
-              <a href="{{ url_for('main.browse', zip_id=zip_id, path=item.path) }}" class="action-btn">📂 Open</a>
+              <a href="{{ url_for('browse.browse', zip_id=zip_id, path=item.path) }}" class="result-action-btn primary">Open</a>
             {% elif item.is_image %}
-              <button onclick="openImageFromSearch('{{ item.path }}')" class="action-btn">👁️ View</button>
+              <button onclick="openImageFromSearch('{{ item.path }}')" class="result-action-btn primary">View</button>
+            {% elif item.is_video %}
+              <button onclick="openVideoFromSearch('{{ item.path }}')" class="result-action-btn primary">Play</button>
             {% else %}
-              <a href="{{ url_for('main.view_file', zip_id=zip_id, path=item.path) }}" class="action-btn" target="_blank">📄 Open</a>
+              <a href="{{ url_for('browse.view_file', zip_id=zip_id, path=item.path) }}" target="_blank" class="result-action-btn primary">Open</a>
             {% endif %}
             {% if not item.is_folder %}
-              <a href="{{ url_for('main.browse', zip_id=zip_id, path=item.directory) }}" class="action-btn secondary">📁 Go to Folder</a>
+              <a href="{{ url_for('browse.browse', zip_id=zip_id, path=item.directory) }}" class="result-action-btn secondary">Go to Folder</a>
             {% endif %}
           </div>
         </div>
@@ -121,50 +138,191 @@
 
     <!-- Pagination -->
     {% if total_pages > 1 %}
-    <div class="pagination">
+    <div class="pagination-modern">
       {% if page > 1 %}
-        <a href="{{ url_for('main.search', zip_id=zip_id, q=query, type=search_type, page=page-1, per_page=per_page) }}" class="pagination-btn">« Previous</a>
+        <a href="{{ url_for('search.search', zip_id=zip_id, q=query, type=search_type, page=page-1, per_page=per_page) }}" class="pagination-btn-modern">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+          Previous
+        </a>
       {% endif %}
       
-      {% for p in range(1, total_pages + 1) %}
-        {% if p == page %}
-          <span class="pagination-btn current">{{ p }}</span>
-        {% elif p <= 3 or p >= total_pages - 2 or (p >= page - 2 and p <= page + 2) %}
-          <a href="{{ url_for('main.search', zip_id=zip_id, q=query, type=search_type, page=p, per_page=per_page) }}" class="pagination-btn">{{ p }}</a>
-        {% elif p == 4 and page > 6 %}
-          <span class="pagination-dots">...</span>
-        {% elif p == total_pages - 3 and page < total_pages - 5 %}
-          <span class="pagination-dots">...</span>
-        {% endif %}
-      {% endfor %}
+      <div class="pagination-pages">
+        {% for p in range(1, total_pages + 1) %}
+          {% if p == page %}
+            <span class="pagination-btn-modern current">{{ p }}</span>
+          {% elif p <= 2 or p >= total_pages - 1 or (p >= page - 1 and p <= page + 1) %}
+            <a href="{{ url_for('search.search', zip_id=zip_id, q=query, type=search_type, page=p, per_page=per_page) }}" class="pagination-btn-modern">{{ p }}</a>
+          {% elif p == 3 and page > 4 %}
+            <span class="pagination-dots">...</span>
+          {% elif p == total_pages - 2 and page < total_pages - 3 %}
+            <span class="pagination-dots">...</span>
+          {% endif %}
+        {% endfor %}
+      </div>
       
       {% if page < total_pages %}
-        <a href="{{ url_for('main.search', zip_id=zip_id, q=query, type=search_type, page=page+1, per_page=per_page) }}" class="pagination-btn">Next »</a>
+        <a href="{{ url_for('search.search', zip_id=zip_id, q=query, type=search_type, page=page+1, per_page=per_page) }}" class="pagination-btn-modern">
+          Next
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/></svg>
+        </a>
       {% endif %}
     </div>
     {% endif %}
 
   {% else %}
-    <div class="no-results">
-      <p>No results found for "<strong>{{ query }}</strong>"</p>
-      <p>Try a different search term or change your filter settings.</p>
+    <div class="no-content">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" style="opacity: 0.3;">
+        <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+      </svg>
+      <h3>No results found</h3>
+      <p>No matches for "<strong>{{ query }}</strong>"</p>
+      <p style="opacity: 0.7;">Try a different search term or change your filter.</p>
     </div>
   {% endif %}
 
 {% else %}
-  <div class="search-placeholder">
-    <p>Enter a search term to find files and folders in {{ zip_name }}.</p>
+  <div class="no-content search-placeholder">
+    <svg width="64" height="64" viewBox="0 0 24 24" fill="currentColor" style="opacity: 0.3;">
+      <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+    </svg>
+    <h3>Search in {{ zip_name }}</h3>
+    <p>Enter a search term to find files and folders.</p>
   </div>
 {% endif %}
 
+<!-- Bottom spacing -->
+<div class="bottom-spacing"></div>
+{% endblock %}
+
+{% block body_content %}
+{{ super() }}
+
+<!-- Image Viewer -->
+<div id="viewer">
+  <button class="nav close" onclick="closeViewer()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+    </svg>
+  </button>
+  <div class="zoom-container" id="zoomContainer">
+    <img id="viewer-img" />
+  </div>
+</div>
+
+<!-- Video Player -->
+<div id="video-player">
+  <button class="nav close" onclick="closeVideoPlayer()">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
+    </svg>
+  </button>
+  <div class="video-container">
+    <div class="video-loading" id="video-loading">
+      <div class="loading-spinner"></div>
+      <span>Loading video...</span>
+    </div>
+    <video id="video-element" controls autoplay>
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <div class="video-info">
+    <span id="video-title"></span>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-function openImageFromSearch(imagePath) {
-    // This function should integrate with your existing image viewer
-    // For now, we'll just open it in a new tab
-    window.open("{{ url_for('main.view_file', zip_id=zip_id, path='') }}" + imagePath, '_blank');
+function handleResultClick(path, type) {
+  if (type === 'folder') {
+    window.location.href = "{{ url_for('browse.browse', zip_id=zip_id, path='') }}" + path;
+  } else if (type === 'image') {
+    openImageFromSearch(path);
+  } else if (type === 'video') {
+    openVideoFromSearch(path);
+  } else {
+    window.open("{{ url_for('browse.view_file', zip_id=zip_id, path='') }}" + path, '_blank');
+  }
 }
+
+function openImageFromSearch(imagePath) {
+  const viewerImg = document.getElementById("viewer-img");
+  const viewer = document.getElementById("viewer");
+  
+  viewer.style.display = "flex";
+  document.body.style.overflow = "hidden";
+  viewerImg.src = "{{ url_for('browse.view_file', zip_id=zip_id, path='') }}" + imagePath;
+}
+
+function closeViewer() {
+  document.getElementById("viewer").style.display = "none";
+  document.body.style.overflow = "";
+}
+
+function openVideoFromSearch(videoPath) {
+  const videoElement = document.getElementById("video-element");
+  const videoTitle = document.getElementById("video-title");
+  const videoPlayer = document.getElementById("video-player");
+  const videoLoading = document.getElementById("video-loading");
+  
+  // Show loading state
+  videoPlayer.style.display = "flex";
+  document.body.style.overflow = "hidden";
+  videoTitle.textContent = videoPath.split('/').pop();
+  if (videoLoading) videoLoading.style.display = "flex";
+  videoElement.style.opacity = "0";
+  
+  // Check if video needs transcoding
+  fetch("{{ url_for('video.video_info', zip_id=zip_id, path='') }}" + videoPath)
+    .then(res => res.json())
+    .then(info => {
+      videoElement.src = info.stream_url;
+      
+      videoElement.onloadeddata = function() {
+        if (videoLoading) videoLoading.style.display = "none";
+        videoElement.style.opacity = "1";
+      };
+      
+      videoElement.onerror = function() {
+        if (videoElement.src !== info.direct_url) {
+          videoElement.src = info.direct_url;
+        } else {
+          if (videoLoading) {
+            videoLoading.innerHTML = '<span style="color: #ef4444;">Failed to load video.</span>';
+          }
+        }
+      };
+      
+      videoElement.play().catch(err => console.log("Autoplay prevented:", err));
+    })
+    .catch(err => {
+      const fullPath = "{{ url_for('browse.view_file', zip_id=zip_id, path='') }}" + videoPath;
+      videoElement.src = fullPath;
+      if (videoLoading) videoLoading.style.display = "none";
+      videoElement.style.opacity = "1";
+    });
+}
+
+function closeVideoPlayer() {
+  const videoElement = document.getElementById("video-element");
+  const videoPlayer = document.getElementById("video-player");
+  
+  videoElement.pause();
+  videoElement.src = "";
+  videoPlayer.style.display = "none";
+  document.body.style.overflow = "";
+}
+
+// Keyboard shortcuts
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    if (document.getElementById('viewer').style.display === 'flex') {
+      closeViewer();
+    }
+    if (document.getElementById('video-player').style.display === 'flex') {
+      closeVideoPlayer();
+    }
+  }
+});
 </script>
 {% endblock %}

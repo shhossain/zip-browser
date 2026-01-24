@@ -6,7 +6,7 @@ import glob
 import pyzipper
 import urllib.parse
 from remotezip import RemoteZip
-from .utils import get_zip_file_hash, is_image, should_show_file
+from .utils import get_zip_file_hash, is_image, is_video, should_show_file
 
 
 class ZipManager:
@@ -85,18 +85,20 @@ class ZipManager:
                 with RemoteZip(zip_path) as zf:
                     if password:
                         zf.setpassword(password.encode("utf-8"))
-                    # Try to read the first file to validate password
-                    if zf.namelist():
-                        zf.read(zf.namelist()[0])
+                    # Find an actual file (not directory) to validate password
+                    file_entries = [f for f in zf.namelist() if not f.endswith("/")]
+                    if file_entries:
+                        zf.read(file_entries[0])
                     return True
             else:
                 # For local ZIP files, use pyzipper
                 with pyzipper.AESZipFile(zip_path, "r") as zf:
                     if password:
                         zf.setpassword(password.encode("utf-8"))
-                    # Try to read the first file to validate password
-                    if zf.namelist():
-                        zf.read(zf.namelist()[0])
+                    # Find an actual file (not directory) to validate password
+                    file_entries = [f for f in zf.namelist() if not f.endswith("/")]
+                    if file_entries:
+                        zf.read(file_entries[0])
                     return True
         except Exception:
             return False
@@ -295,7 +297,7 @@ class ZipManager:
         Args:
             zip_id: The ZIP file ID
             query: Search query string
-            search_type: Type of search - "all", "images", "folders", "files"
+            search_type: Type of search - "all", "images", "videos", "folders", "files"
 
         Returns:
             List of matching file paths with metadata
@@ -319,12 +321,15 @@ class ZipManager:
                 if query_lower in name_lower:
                     is_folder = tree[name] is not None
                     is_image_file = not is_folder and is_image(name)
+                    is_video_file = not is_folder and is_video(name)
 
                     # Filter based on search type
                     include = False
                     if search_type == "all":
                         include = True
                     elif search_type == "images" and is_image_file:
+                        include = True
+                    elif search_type == "videos" and is_video_file:
                         include = True
                     elif search_type == "folders" and is_folder:
                         include = True
@@ -337,6 +342,7 @@ class ZipManager:
                             "path": full_path,
                             "is_folder": is_folder,
                             "is_image": is_image_file,
+                            "is_video": is_video_file,
                             "directory": current_path or "/",
                             "extension": (
                                 os.path.splitext(name.lower())[1]

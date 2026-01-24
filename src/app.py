@@ -13,7 +13,12 @@ from .auth import AuthManager
 from .user_manager import UserManager
 from .user_cli import UserCLI, create_user_subparser
 from .zip_manager import ZipManager
-from .routes import create_routes
+from .routes import (
+    create_auth_routes,
+    create_browse_routes,
+    create_video_routes,
+    create_search_routes,
+)
 from .utils import get_file_icon
 
 
@@ -151,7 +156,7 @@ def create_app(config=None):
     # Setup Flask-Login
     login_manager = LoginManager()
     login_manager.init_app(app)
-    login_manager.login_view = "main.login"
+    login_manager.login_view = "auth.login"
     login_manager.login_message = "Please log in to access the ZIP file browser."
 
     @login_manager.user_loader
@@ -166,9 +171,11 @@ def create_app(config=None):
     # Expose CSRF token helper in templates for AJAX forms
     app.jinja_env.globals["csrf_token"] = generate_csrf
 
-    # Register routes
-    routes_bp = create_routes(auth_manager, zip_manager)
-    app.register_blueprint(routes_bp)
+    # Register modular blueprints
+    app.register_blueprint(create_auth_routes(auth_manager))
+    app.register_blueprint(create_browse_routes(zip_manager))
+    app.register_blueprint(create_video_routes(zip_manager))
+    app.register_blueprint(create_search_routes(zip_manager))
 
     # Store config for access in other parts of the app
     app.config["APP_CONFIG"] = config

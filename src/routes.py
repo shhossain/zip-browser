@@ -6,6 +6,10 @@ import os
 import io
 import math
 import mimetypes
+import subprocess
+import tempfile
+import threading
+import hashlib
 from flask import (
     Blueprint,
     request,
@@ -21,7 +25,43 @@ from flask_login import login_user, logout_user, login_required, current_user
 from PIL import Image
 
 from .auth import LoginForm
-from .utils import is_image, validate_pagination_params, is_system_file
+from .utils import is_image, is_video, validate_pagination_params, is_system_file, needs_transcoding
+
+
+def check_ffmpeg_available():
+    """Check if FFmpeg is available on the system"""
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-version"],
+            capture_output=True,
+            timeout=5
+        )
+        return result.returncode == 0
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+
+FFMPEG_AVAILABLE = check_ffmpeg_available()
+
+# Limit concurrent FFmpeg processes to prevent server overload
+FFMPEG_SEMAPHORE = threading.Semaphore(2)
+
+# Cache for transcoded videos and thumbnails
+VIDEO_CACHE_DIR = tempfile.mkdtemp(prefix="zip_browser_video_cache_")
+THUMB_CACHE_DIR = tempfile.mkdtemp(prefix="zip_browser_thumb_cache_")
+
+
+def get_video_cache_path(zip_id, path):
+    """Get the cache path for a transcoded video"""
+    cache_key = hashlib.md5(f"{zip_id}_{path}".encode()).hexdigest()
+    return os.path.join(VIDEO_CACHE_DIR, f"{cache_key}.mp4")
+
+
+def get_thumb_cache_path(zip_id, path, thumb_type="static"):
+    """Get the cache path for a video thumbnail"""
+    cache_key = hashlib.md5(f"{zip_id}_{path}".encode()).hexdigest()
+    ext = "gif" if thumb_type == "gif" else "jpg"
+    return os.path.join(THUMB_CACHE_DIR, f"{cache_key}_{thumb_type}.{ext}")
 
 
 def create_routes(auth_manager, zip_manager):
@@ -225,7 +265,7 @@ def create_routes(auth_manager, zip_manager):
             if "zfile" in locals() and hasattr(zfile, "close"):
                 try:
                     zfile.close()
-                except:
+                except Exception:
                     pass
 
     @bp.route("/view/<zip_id>/<path:path>")
@@ -259,8 +299,348 @@ def create_routes(auth_manager, zip_manager):
             if "zfile" in locals() and hasattr(zfile, "close"):
                 try:
                     zfile.close()
-                except:
+                except Exception:
                     pass
+
+    @bp.route("/stream/<zip_id>/<path:path>")
+    @login_required
+    def stream_video(zip_id, path):
+        """Stream video with FFmpeg transcoding for unsupported formats - with caching and seeking support"""
+        zip_info = zip_manager.get_zip_info(zip_id)
+        if not zip_info:
+            abort(404)
+
+        # Ensure the ZIP file is loaded
+        if not zip_info["zfile"]:
+            if not zip_manager.load_zip_file(zip_id):
+                abort(404)
+
+        # Check if transcoding is needed
+        if not needs_transcoding(path):
+            # For browser-native formats, just serve the file directly
+            return redirect(url_for('main.view_file', zip_id=zip_id, path=path))
+
+        if not FFMPEG_AVAILABLE:
+            # FFmpeg not available, try to serve directly anyway
+            return redirect(url_for('main.view_file', zip_id=zip_id, path=path))
+
+        # Check if we have a cached version
+        cache_path = get_video_cache_path(zip_id, path)
+        
+        if os.path.exists(cache_path):
+            # Serve the cached file with range request support for seeking
+            return send_file(
+                cache_path,
+                mimetype="video/mp4",
+                conditional=True  # Enables range request support
+            )
+
+        # Need to transcode - use semaphore to limit concurrent processes
+        acquired = FFMPEG_SEMAPHORE.acquire(timeout=30)
+        if not acquired:
+            # Too many concurrent transcoding requests
+            return jsonify({"error": "Server busy, please try again later"}), 503
+
+        try:
+            # Get a fresh zip file object for reading
+            zfile = zip_manager.get_zip_file_object(zip_id)
+            if not zfile:
+                abort(404)
+
+            # Extract video to a temporary file
+            video_data = zfile.read(path)
+            
+            # Close the zip file
+            if hasattr(zfile, "close"):
+                zfile.close()
+
+            # Create temp file with original extension
+            ext = os.path.splitext(path)[1]
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_input:
+                tmp_input.write(video_data)
+                tmp_input_path = tmp_input.name
+
+            try:
+                # Transcode to cache file using FFmpeg
+                process = subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-i", tmp_input_path,
+                        "-c:v", "libx264",
+                        "-preset", "fast",
+                        "-crf", "23",
+                        "-c:a", "aac",
+                        "-b:a", "128k",
+                        "-movflags", "+faststart",
+                        "-y",
+                        cache_path
+                    ],
+                    capture_output=True,
+                    timeout=300  # 5 minute timeout
+                )
+
+                if process.returncode != 0:
+                    print(f"FFmpeg error: {process.stderr.decode()}")
+                    # Fall back to direct file serving
+                    return redirect(url_for('main.view_file', zip_id=zip_id, path=path))
+
+            finally:
+                # Clean up input temp file
+                try:
+                    os.unlink(tmp_input_path)
+                except Exception:
+                    pass
+
+            # Serve the cached file with range request support
+            return send_file(
+                cache_path,
+                mimetype="video/mp4",
+                conditional=True
+            )
+
+        except subprocess.TimeoutExpired:
+            print(f"FFmpeg timeout for {zip_id}/{path}")
+            return jsonify({"error": "Video transcoding timed out"}), 504
+        except Exception as e:
+            print(f"Video streaming error for {zip_id}/{path}: {e}")
+            # Fall back to direct file serving
+            return redirect(url_for('main.view_file', zip_id=zip_id, path=path))
+        finally:
+            FFMPEG_SEMAPHORE.release()
+
+    @bp.route("/video-info/<zip_id>/<path:path>")
+    @login_required
+    def video_info(zip_id, path):
+        """Get video information including whether transcoding is needed"""
+        return jsonify({
+            "needs_transcoding": needs_transcoding(path),
+            "ffmpeg_available": FFMPEG_AVAILABLE,
+            "stream_url": url_for('main.stream_video', zip_id=zip_id, path=path) if needs_transcoding(path) and FFMPEG_AVAILABLE else url_for('main.view_file', zip_id=zip_id, path=path),
+            "direct_url": url_for('main.view_file', zip_id=zip_id, path=path)
+        })
+
+    @bp.route("/video-thumb/<zip_id>/<path:path>")
+    @login_required
+    def video_thumbnail(zip_id, path):
+        """Generate a static thumbnail for a video"""
+        zip_info = zip_manager.get_zip_info(zip_id)
+        if not zip_info:
+            abort(404)
+
+        if not FFMPEG_AVAILABLE:
+            abort(404)
+
+        # Ensure the ZIP file is loaded
+        if not zip_info["zfile"]:
+            if not zip_manager.load_zip_file(zip_id):
+                abort(404)
+
+        # Check cache first
+        cache_path = get_thumb_cache_path(zip_id, path, "static")
+        if os.path.exists(cache_path):
+            return send_file(cache_path, mimetype="image/jpeg")
+
+        # Use semaphore to limit concurrent FFmpeg processes
+        acquired = FFMPEG_SEMAPHORE.acquire(timeout=10)
+        if not acquired:
+            abort(503)
+
+        try:
+            # Get video from zip
+            zfile = zip_manager.get_zip_file_object(zip_id)
+            if not zfile:
+                abort(404)
+
+            video_data = zfile.read(path)
+            if hasattr(zfile, "close"):
+                zfile.close()
+
+            # Create temp input file
+            ext = os.path.splitext(path)[1]
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_input:
+                tmp_input.write(video_data)
+                tmp_input_path = tmp_input.name
+
+            try:
+                # First get video duration to find a good frame
+                probe_result = subprocess.run(
+                    [
+                        "ffprobe",
+                        "-v", "error",
+                        "-show_entries", "format=duration",
+                        "-of", "default=noprint_wrappers=1:nokey=1",
+                        tmp_input_path
+                    ],
+                    capture_output=True,
+                    timeout=10
+                )
+                
+                duration = 0
+                try:
+                    duration = float(probe_result.stdout.decode().strip())
+                except Exception:
+                    duration = 0
+                
+                # Get frame at 10% of video or 1 second, whichever is smaller
+                seek_time = min(duration * 0.1, 1.0) if duration > 0 else 0
+
+                # Extract thumbnail using FFmpeg
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-ss", str(seek_time),
+                        "-i", tmp_input_path,
+                        "-vframes", "1",
+                        "-vf", "scale=320:-1",
+                        "-q:v", "3",
+                        "-y",
+                        cache_path
+                    ],
+                    capture_output=True,
+                    timeout=30
+                )
+
+                if os.path.exists(cache_path):
+                    return send_file(cache_path, mimetype="image/jpeg")
+                else:
+                    abort(500)
+
+            finally:
+                try:
+                    os.unlink(tmp_input_path)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            print(f"Video thumbnail error: {e}")
+            abort(500)
+        finally:
+            FFMPEG_SEMAPHORE.release()
+
+    @bp.route("/video-thumb-gif/<zip_id>/<path:path>")
+    @login_required
+    def video_thumbnail_gif(zip_id, path):
+        """Generate an animated GIF preview for a video"""
+        zip_info = zip_manager.get_zip_info(zip_id)
+        if not zip_info:
+            abort(404)
+
+        if not FFMPEG_AVAILABLE:
+            abort(404)
+
+        # Ensure the ZIP file is loaded
+        if not zip_info["zfile"]:
+            if not zip_manager.load_zip_file(zip_id):
+                abort(404)
+
+        # Check cache first
+        cache_path = get_thumb_cache_path(zip_id, path, "gif")
+        if os.path.exists(cache_path):
+            return send_file(cache_path, mimetype="image/gif")
+
+        # Use semaphore
+        acquired = FFMPEG_SEMAPHORE.acquire(timeout=10)
+        if not acquired:
+            abort(503)
+
+        try:
+            # Get video from zip
+            zfile = zip_manager.get_zip_file_object(zip_id)
+            if not zfile:
+                abort(404)
+
+            video_data = zfile.read(path)
+            if hasattr(zfile, "close"):
+                zfile.close()
+
+            # Create temp input file
+            ext = os.path.splitext(path)[1]
+            with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp_input:
+                tmp_input.write(video_data)
+                tmp_input_path = tmp_input.name
+
+            try:
+                # Get video duration
+                probe_result = subprocess.run(
+                    [
+                        "ffprobe",
+                        "-v", "error",
+                        "-show_entries", "format=duration",
+                        "-of", "default=noprint_wrappers=1:nokey=1",
+                        tmp_input_path
+                    ],
+                    capture_output=True,
+                    timeout=10
+                )
+                
+                duration = 0
+                try:
+                    duration = float(probe_result.stdout.decode().strip())
+                except Exception:
+                    duration = 10  # Default
+
+                # Create GIF with 8-10 frames from different parts of video
+                # Use fps=0.5 to get 1 frame every 2 seconds, or fewer frames for short videos
+                if duration < 5:
+                    fps_filter = "fps=2"  # 2 fps for very short videos
+                elif duration < 30:
+                    fps_filter = "fps=0.5"  # 1 frame every 2 seconds
+                else:
+                    fps_filter = "fps=0.2"  # 1 frame every 5 seconds
+
+                # Create GIF with palette for better quality
+                palette_path = tmp_input_path + "_palette.png"
+                
+                # Generate palette
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-i", tmp_input_path,
+                        "-vf", f"{fps_filter},scale=200:-1:flags=lanczos,palettegen=max_colors=64",
+                        "-y",
+                        palette_path
+                    ],
+                    capture_output=True,
+                    timeout=60
+                )
+
+                # Generate GIF using palette
+                subprocess.run(
+                    [
+                        "ffmpeg",
+                        "-i", tmp_input_path,
+                        "-i", palette_path,
+                        "-lavfi", f"{fps_filter},scale=200:-1:flags=lanczos[x];[x][1:v]paletteuse",
+                        "-t", "10",  # Max 10 seconds of video
+                        "-y",
+                        cache_path
+                    ],
+                    capture_output=True,
+                    timeout=60
+                )
+
+                # Clean up palette
+                try:
+                    os.unlink(palette_path)
+                except Exception:
+                    pass
+
+                if os.path.exists(cache_path):
+                    return send_file(cache_path, mimetype="image/gif")
+                else:
+                    abort(500)
+
+            finally:
+                try:
+                    os.unlink(tmp_input_path)
+                except Exception:
+                    pass
+
+        except Exception as e:
+            print(f"Video GIF thumbnail error: {e}")
+            abort(500)
+        finally:
+            FFMPEG_SEMAPHORE.release()
 
     @bp.route("/images/<zip_id>/")
     @bp.route("/images/<zip_id>/<path:dir_path>")
@@ -303,7 +683,7 @@ def create_routes(auth_manager, zip_manager):
         per_page = request.args.get("per_page", 50)
 
         # Validate parameters
-        allowed_search_types = ["all", "images", "folders", "files"]
+        allowed_search_types = ["all", "images", "videos", "folders", "files"]
         if search_type not in allowed_search_types:
             search_type = "all"
 
@@ -349,6 +729,7 @@ def _create_item_dict(name, dir_content, zip_id, zip_manager, path):
         "name": name,
         "is_folder": dir_content is not None,
         "is_image": False,
+        "is_video": False,
         "preview_image": None,
         "size": None,
         "extension": "",
@@ -365,8 +746,12 @@ def _create_item_dict(name, dir_content, zip_id, zip_manager, path):
         # It's a file
         item["extension"] = os.path.splitext(name.lower())[1]
         item["is_image"] = is_image(name)
+        item["is_video"] = is_video(name)
         if item["is_image"]:
             item["type"] = "image"
+            item["preview_image"] = path + "/" + name if path else name
+        elif item["is_video"]:
+            item["type"] = "video"
             item["preview_image"] = path + "/" + name if path else name
         else:
             item["type"] = "file"
@@ -382,6 +767,7 @@ def _create_search_result_item(result, zip_id):
         "directory": result["directory"],
         "is_folder": result["is_folder"],
         "is_image": result["is_image"],
+        "is_video": result.get("is_video", False),
         "extension": result["extension"],
         "preview_image": None,
     }
@@ -390,6 +776,9 @@ def _create_search_result_item(result, zip_id):
         item["type"] = "folder"
     elif item["is_image"]:
         item["type"] = "image"
+        item["preview_image"] = result["path"]
+    elif item["is_video"]:
+        item["type"] = "video"
         item["preview_image"] = result["path"]
     else:
         item["type"] = "file"

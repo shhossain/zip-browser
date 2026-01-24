@@ -36,6 +36,37 @@ def is_image(filename):
     return ext in image_extensions
 
 
+def is_video(filename):
+    """Check if a file is a video based on its extension"""
+    video_extensions = {
+        ".mp4",
+        ".webm",
+        ".ogg",
+        ".mov",
+        ".avi",
+        ".mkv",
+        ".m4v",
+        ".wmv",
+        ".flv",
+        ".3gp",
+    }
+    ext = os.path.splitext(filename.lower())[1]
+    return ext in video_extensions
+
+
+def is_browser_native_video(filename):
+    """Check if a video format is natively supported by browsers"""
+    # These formats are generally supported by modern browsers without transcoding
+    native_extensions = {".mp4", ".webm", ".ogg"}
+    ext = os.path.splitext(filename.lower())[1]
+    return ext in native_extensions
+
+
+def needs_transcoding(filename):
+    """Check if a video file needs transcoding for browser playback"""
+    return is_video(filename) and not is_browser_native_video(filename)
+
+
 def is_system_file(filename):
     """Check if a file is a system/metadata file that should be filtered out"""
     filename_lower = filename.lower()
