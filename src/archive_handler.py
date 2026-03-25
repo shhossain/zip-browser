@@ -91,6 +91,18 @@ def is_supported_archive(filepath):
     return get_archive_ext(filepath) in ALL_ARCHIVE_EXTENSIONS
 
 
+def is_nested_archive(filename):
+    """Check if a filename inside an archive is itself a supported archive.
+
+    Excludes standalone .gz files since they are typically compressed single
+    files rather than browsable archives.
+    """
+    ext = get_archive_ext(filename)
+    if ext in GZ_EXTENSIONS and ext not in TAR_GZ_EXTENSIONS:
+        return False
+    return ext in ALL_ARCHIVE_EXTENSIONS
+
+
 def _check_format_available(ext):
     """Check if the required library for an extension is available."""
     if ext in SEVENZ_EXTENSIONS and not HAS_7Z:

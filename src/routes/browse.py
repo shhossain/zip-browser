@@ -18,6 +18,7 @@ from flask_login import login_required
 from PIL import Image
 
 from ..utils import is_image, is_video, validate_pagination_params, is_system_file
+from ..archive_handler import is_nested_archive
 from ..cache_manager import cache_manager
 
 
@@ -65,6 +66,20 @@ def create_browse_routes(zip_manager):
         if not zip_info["zfile"]:
             if not zip_manager.load_zip_file(zip_id):
                 abort(500)
+
+        # Check if the path points to a nested archive
+        if path and zip_manager.is_item_archive(zip_id, path):
+            nested_id, needs_password = zip_manager.open_nested_archive(zip_id, path)
+            if nested_id is None:
+                abort(500)
+            from flask import redirect, url_for
+            if needs_password:
+                return render_template(
+                    "zip_unlock.html",
+                    zip_info=zip_manager.get_zip_info(nested_id),
+                    zip_id=nested_id,
+                )
+            return redirect(url_for("browse.browse", zip_id=nested_id))
 
         cur_dir = zip_manager.get_dir_tree(zip_id, path)
         if cur_dir is None:
@@ -249,9 +264,11 @@ def create_browse_routes(zip_manager):
 
 def _create_item_dict(name, dir_content, zip_id, zip_manager, path):
     """Create item dictionary for template rendering."""
+    is_archive = dir_content == "__archive__"
     item = {
         "name": name,
-        "is_folder": dir_content is not None,
+        "is_folder": isinstance(dir_content, dict),
+        "is_archive": is_archive,
         "is_image": False,
         "is_video": False,
         "preview_image": None,
@@ -265,6 +282,9 @@ def _create_item_dict(name, dir_content, zip_id, zip_manager, path):
         first_image = zip_manager.get_first_image_in_folder(zip_id, folder_path)
         if first_image:
             item["preview_image"] = first_image
+    elif is_archive:
+        item["type"] = "archive"
+        item["extension"] = os.path.splitext(name.lower())[1]
     else:
         item["extension"] = os.path.splitext(name.lower())[1]
         item["is_image"] = is_image(name)

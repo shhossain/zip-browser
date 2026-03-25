@@ -187,6 +187,64 @@ def mixed_archive_dir(tmp_path, sample_zip, sample_tar, sample_tar_gz):
     shutil.copy(sample_tar, dest / "b.tar")
     shutil.copy(sample_tar_gz, dest / "c.tar.gz")
     return str(dest)
+
+
+@pytest.fixture()
+def nested_zip(tmp_path):
+    """Create a ZIP that contains another ZIP inside it."""
+    # Build the inner archive
+    inner_path = tmp_path / "inner.zip"
+    with zipfile.ZipFile(inner_path, "w") as inner:
+        inner.writestr("inner_readme.txt", "Hello from inner archive")
+        inner.writestr("inner_dir/file.txt", "Nested file")
+
+    # Build the outer archive containing the inner one
+    outer_path = tmp_path / "outer.zip"
+    with zipfile.ZipFile(outer_path, "w") as outer:
+        outer.writestr("top_level.txt", "Top level file")
+        outer.write(inner_path, "archives/inner.zip")
+
+    return str(outer_path)
+
+
+@pytest.fixture()
+def nested_password_zip(tmp_path):
+    """Create a ZIP containing a password-protected inner ZIP."""
+    import pyzipper
+
+    # Build a password-protected inner archive
+    inner_path = tmp_path / "secret_inner.zip"
+    with pyzipper.AESZipFile(inner_path, "w", compression=pyzipper.ZIP_DEFLATED,
+                              encryption=pyzipper.WZ_AES) as inner:
+        inner.setpassword(b"inner_pass")
+        inner.writestr("secret.txt", "Inner secret")
+
+    # Wrap in an outer archive
+    outer_path = tmp_path / "outer_with_protected.zip"
+    with zipfile.ZipFile(outer_path, "w") as outer:
+        outer.writestr("readme.txt", "Outer readme")
+        outer.write(inner_path, "secret_inner.zip")
+
+    return str(outer_path)
+
+
+@pytest.fixture()
+def nested_tar_in_zip(tmp_path):
+    """Create a ZIP that contains a TAR archive inside it."""
+    # Build a tar archive
+    tar_path = tmp_path / "inner.tar"
+    with tarfile.open(tar_path, "w") as tf:
+        for name, content in [("tar_file.txt", b"Hello from tar")]:
+            info = tarfile.TarInfo(name=name)
+            info.size = len(content)
+            tf.addfile(info, io.BytesIO(content))
+
+    outer_path = tmp_path / "outer_with_tar.zip"
+    with zipfile.ZipFile(outer_path, "w") as outer:
+        outer.writestr("readme.txt", "Has a tar inside")
+        outer.write(tar_path, "inner.tar")
+
+    return str(outer_path)
 # User manager fixture (isolated per-test)
 # ---------------------------------------------------------------------------
 

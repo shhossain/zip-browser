@@ -121,6 +121,13 @@
           {% endif %}
           <div class="item-name" title="{{ item.name }}">{{ item.name }}</div>
         </div>
+      {% elif item.is_archive %}
+        <div class="explorer-item folder-item" onclick="navigateToFolder('{{ item.name }}')">
+          <div class="folder-placeholder">
+            <span class="icon-file-archive"></span>
+          </div>
+          <div class="item-name" title="{{ item.name }}">{{ item.name }}</div>
+        </div>
       {% elif item.is_image %}
         <div class="explorer-item image-item" onclick="openViewer('{{ item.name }}')">
           <img class="item-thumbnail" src="{{ url_for('browse.thumb', zip_id=zip_id, path=item.preview_image, size=thumb_size) }}" alt="{{ item.name }}" loading="lazy" />
@@ -193,6 +200,16 @@
             <span class="item-name">{{ item.name }}</span>
           </div>
           <div class="col-type">Folder</div>
+          <div class="col-size">-</div>
+          <div></div>
+        </div>
+      {% elif item.is_archive %}
+        <div class="explorer-item-row folder-row" onclick="navigateToFolder('{{ item.name }}')">
+          <div class="col-name">
+            <span class="row-icon"><span class="icon-file-archive"></span></span>
+            <span class="item-name">{{ item.name }}</span>
+          </div>
+          <div class="col-type">Archive</div>
           <div class="col-size">-</div>
           <div></div>
         </div>

@@ -1,14 +1,18 @@
 """
 Archive file management functionality.
 Supports ZIP, RAR, 7Z, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, GZ, and remote ZIP URLs.
+Supports nested archives (archives inside archives) with optional password.
 """
 import os
 import glob
+import hashlib
+import tempfile
 import urllib.parse
 
 from .archive_handler import (
     open_archive,
     is_url as _is_url,
+    is_nested_archive,
     ARCHIVE_GLOB_PATTERNS,
 )
 from .utils import get_zip_file_hash, is_image, is_video, should_show_file
@@ -67,7 +71,12 @@ class ZipManager:
             return False
 
     def build_zip_tree(self, zfile):
-        """Build file tree structure from zip file"""
+        """Build file tree structure from zip file.
+
+        Files that are themselves supported archives are stored with the
+        sentinel value ``"__archive__"`` instead of ``None`` so that the
+        UI can render them as browsable entries.
+        """
         zip_tree = {}
         for name in zfile.namelist():
             # Skip system files and metadata files
@@ -86,7 +95,10 @@ class ZipManager:
             else:
                 # Only add file if we didn't break out of the loop
                 if not name.endswith("/"):
-                    cur[parts[-1]] = None
+                    if is_nested_archive(name):
+                        cur[parts[-1]] = "__archive__"
+                    else:
+                        cur[parts[-1]] = None
         return zip_tree
 
     def discover_zip_files(self, zip_path):
@@ -166,6 +178,103 @@ class ZipManager:
         except Exception:
             return None
 
+    # ------------------------------------------------------------------
+    # Nested archive support
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def get_nested_archive_id(parent_zip_id, inner_path):
+        """Generate a deterministic ID for a nested archive."""
+        return hashlib.md5(f"{parent_zip_id}:{inner_path}".encode()).hexdigest()[:12]
+
+    def is_item_archive(self, zip_id, path):
+        """Check if an item in the tree is a nested archive (``__archive__`` sentinel)."""
+        if zip_id not in self.zip_files or not self.zip_files[zip_id]["tree"]:
+            return False
+        parts = path.strip("/").split("/") if path.strip("/") else []
+        cur = self.zip_files[zip_id]["tree"]
+        for p in parts[:-1]:
+            if isinstance(cur, dict) and p in cur:
+                cur = cur[p]
+            else:
+                return False
+        if parts:
+            return cur.get(parts[-1]) == "__archive__"
+        return False
+
+    def open_nested_archive(self, parent_zip_id, inner_path, password=None):
+        """Extract a nested archive from its parent and register it for browsing.
+
+        Returns ``(nested_id, needs_password)`` on success or ``(None, False)``
+        on unrecoverable failure.
+        """
+        nested_id = self.get_nested_archive_id(parent_zip_id, inner_path)
+
+        # Already opened?
+        if nested_id in self.zip_files and self.zip_files[nested_id].get("zfile"):
+            return nested_id, False
+
+        parent_info = self.zip_files.get(parent_zip_id)
+        if not parent_info:
+            return None, False
+
+        # Extract inner archive bytes from parent
+        try:
+            parent_zfile = self.get_zip_file_object(parent_zip_id)
+            if not parent_zfile:
+                return None, False
+            inner_bytes = parent_zfile.read(inner_path)
+            parent_zfile.close()
+        except Exception:
+            return None, False
+
+        # Write to a temp file so ArchiveFile can open it
+        inner_name = os.path.basename(inner_path)
+        tmp_dir = tempfile.mkdtemp(prefix="zipbrowser_nested_")
+        tmp_path = os.path.join(tmp_dir, inner_name)
+        with open(tmp_path, "wb") as f:
+            f.write(inner_bytes)
+
+        # Register the nested archive entry (even before unlocking)
+        if nested_id not in self.zip_files:
+            self.zip_files[nested_id] = {
+                "path": tmp_path,
+                "name": inner_name,
+                "is_remote": False,
+                "requires_password": False,
+                "password": None,
+                "zfile": None,
+                "tree": {},
+                "nested": True,
+                "parent_zip_id": parent_zip_id,
+                "inner_path": inner_path,
+                "_tmp_dir": tmp_dir,
+            }
+
+        # Check if password is needed
+        needs_password = self.check_zip_requires_password(tmp_path)
+        self.zip_files[nested_id]["requires_password"] = needs_password
+
+        if needs_password and not password:
+            return nested_id, True
+
+        # Try to load
+        if password:
+            self.zip_files[nested_id]["password"] = password
+        result = self.load_zip_file(nested_id, password=password)
+        if result is None and not needs_password:
+            return None, False
+
+        return nested_id, False
+
+    def cleanup_nested_archives(self):
+        """Remove temp files for all nested archives."""
+        import shutil
+        for zip_id, info in list(self.zip_files.items()):
+            if info.get("nested") and info.get("_tmp_dir"):
+                shutil.rmtree(info["_tmp_dir"], ignore_errors=True)
+                del self.zip_files[zip_id]
+
     def initialize_zip_files(self, zip_paths):
         """Initialize available ZIP files from multiple paths"""
         # Handle both single path (for backward compatibility) and multiple paths
@@ -202,14 +311,19 @@ class ZipManager:
                 }
 
     def get_dir_tree(self, zip_id, path):
-        """Get directory tree for a specific zip file and path"""
+        """Get directory tree for a specific zip file and path.
+
+        Returns ``None`` for invalid paths.  If the path resolves to the
+        ``"__archive__"`` sentinel the caller should handle it as a
+        nested archive rather than a directory.
+        """
         if zip_id not in self.zip_files or not self.zip_files[zip_id]["tree"]:
             return None
 
         parts = path.strip("/").split("/") if path.strip("/") else []
         cur = self.zip_files[zip_id]["tree"]
         for p in parts:
-            if p in cur:
+            if isinstance(cur, dict) and p in cur:
                 cur = cur[p]
             else:
                 return None
@@ -224,10 +338,10 @@ class ZipManager:
         def find_first_image(tree, current_path=""):
             for name in sorted(tree.keys()):
                 full_path = current_path + "/" + name if current_path else name
-                if tree[name] is None:  # It's a file
+                if tree[name] is None or tree[name] == "__archive__":  # file or nested archive
                     if is_image(name):
                         return full_path
-                else:  # It's a folder
+                elif isinstance(tree[name], dict):  # folder
                     result = find_first_image(tree[name], full_path)
                     if result:
                         return result
@@ -273,11 +387,14 @@ class ZipManager:
                 name_lower = name.lower()
                 full_path = current_path + "/" + name if current_path else name
 
+                is_archive_entry = tree[name] == "__archive__"
+                is_folder = isinstance(tree[name], dict)
+                is_file = tree[name] is None or is_archive_entry
+
                 # Check if the name matches the query
                 if query_lower in name_lower:
-                    is_folder = tree[name] is not None
-                    is_image_file = not is_folder and is_image(name)
-                    is_video_file = not is_folder and is_video(name)
+                    is_image_file = is_file and is_image(name)
+                    is_video_file = is_file and is_video(name)
 
                     # Filter based on search type
                     include = False
@@ -289,7 +406,7 @@ class ZipManager:
                         include = True
                     elif search_type == "folders" and is_folder:
                         include = True
-                    elif search_type == "files" and not is_folder:
+                    elif search_type == "files" and is_file:
                         include = True
 
                     if include:
@@ -299,6 +416,7 @@ class ZipManager:
                             "is_folder": is_folder,
                             "is_image": is_image_file,
                             "is_video": is_video_file,
+                            "is_archive": is_archive_entry,
                             "directory": current_path or "/",
                             "extension": (
                                 os.path.splitext(name.lower())[1]
@@ -309,7 +427,7 @@ class ZipManager:
                         results.append(result)
 
                 # Recursively search in subdirectories
-                if tree[name] is not None:  # It's a folder
+                if is_folder:
                     search_in_tree(tree[name], full_path)
 
         search_in_tree(zip_tree)
