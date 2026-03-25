@@ -26,4 +26,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 py-modules = ["cli_entry", "main", "manage_users"]
-packages = ["src"]
+
+[tool.setuptools.packages.find]
+include = ["src", "src.*"]
+
+[tool.setuptools.package-data]
+src = ["templates/**", "static/**"]
