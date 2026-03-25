@@ -809,6 +809,15 @@ wheels = [
 ]
 
 [[package]]
+name = "rarfile"
+version = "4.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/3f/3118a797444e7e30e784921c4bfafb6500fb288a0c84cb8c32ed15853c16/rarfile-4.2.tar.gz", hash = "sha256:8e1c8e72d0845ad2b32a47ab11a719bc2e41165ec101fd4d3fe9e92aa3f469ef", size = 153476, upload-time = "2024-04-03T17:10:53.798Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/62/fc/ab37559419ca36dd8dd317c3a98395ed4dcee2beeb28bf6059b972906727/rarfile-4.2-py3-none-any.whl", hash = "sha256:8757e1e3757e32962e229cab2432efc1f15f210823cc96ccba0f6a39d17370c9", size = 29052, upload-time = "2024-04-03T17:10:52.632Z" },
+]
+
+[[package]]
 name = "remotezip"
 version = "0.12.3"
 source = { registry = "https://pypi.org/simple" }
@@ -896,9 +905,11 @@ dependencies = [
     { name = "flask-login" },
     { name = "flask-wtf" },
     { name = "pillow" },
+    { name = "py7zr" },
     { name = "pytest" },
     { name = "pyziper" },
     { name = "pyzipper" },
+    { name = "rarfile" },
     { name = "remotezip" },
     { name = "tabulate" },
 ]
@@ -910,9 +921,11 @@ requires-dist = [
     { name = "flask-login", specifier = ">=0.6.3" },
     { name = "flask-wtf", specifier = ">=1.2.2" },
     { name = "pillow", specifier = ">=11.3.0" },
+    { name = "py7zr", specifier = ">=0.20.0" },
     { name = "pytest", specifier = ">=9.0.2" },
     { name = "pyziper", specifier = ">=0.3" },
     { name = "pyzipper", specifier = ">=0.3.6" },
+    { name = "rarfile", specifier = ">=4.1" },
     { name = "remotezip", specifier = ">=0.12.3" },
     { name = "tabulate", specifier = ">=0.9.0" },
 ]

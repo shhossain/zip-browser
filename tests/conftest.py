@@ -3,8 +3,10 @@ Shared fixtures for ZIP Browser tests.
 """
 import os
 import io
+import gzip
 import json
 import shutil
+import tarfile
 import tempfile
 import zipfile
 
@@ -14,6 +16,19 @@ from src.config import Config
 from src.user_manager import UserManager
 from src.auth import AuthManager
 from src.zip_manager import ZipManager
+
+# Optional archive libraries
+try:
+    import py7zr
+    HAS_7Z = True
+except ImportError:
+    HAS_7Z = False
+
+try:
+    import rarfile
+    HAS_RAR = True
+except ImportError:
+    HAS_RAR = False
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +95,98 @@ def image_zip(tmp_path):
     return str(zip_path)
 
 
-# ---------------------------------------------------------------------------
+@pytest.fixture()
+def sample_tar(tmp_path):
+    """Create a simple TAR archive for testing."""
+    tar_path = tmp_path / "sample.tar"
+    with tarfile.open(tar_path, "w") as tf:
+        for name, content in [
+            ("readme.txt", b"Hello World"),
+            ("docs/guide.md", b"# Guide\nSome content"),
+            ("images/photo.jpg", b"\xff\xd8\xff\xe0dummy-jpeg"),
+        ]:
+            info = tarfile.TarInfo(name=name)
+            info.size = len(content)
+            tf.addfile(info, io.BytesIO(content))
+    return str(tar_path)
+
+
+@pytest.fixture()
+def sample_tar_gz(tmp_path):
+    """Create a TAR.GZ archive for testing."""
+    tar_path = tmp_path / "sample.tar.gz"
+    with tarfile.open(tar_path, "w:gz") as tf:
+        for name, content in [
+            ("readme.txt", b"Hello World"),
+            ("docs/guide.md", b"# Guide\nSome content"),
+            ("images/photo.jpg", b"\xff\xd8\xff\xe0dummy-jpeg"),
+        ]:
+            info = tarfile.TarInfo(name=name)
+            info.size = len(content)
+            tf.addfile(info, io.BytesIO(content))
+    return str(tar_path)
+
+
+@pytest.fixture()
+def sample_tar_bz2(tmp_path):
+    """Create a TAR.BZ2 archive for testing."""
+    tar_path = tmp_path / "sample.tar.bz2"
+    with tarfile.open(tar_path, "w:bz2") as tf:
+        for name, content in [
+            ("readme.txt", b"Hello World"),
+            ("images/photo.jpg", b"\xff\xd8\xff\xe0dummy-jpeg"),
+        ]:
+            info = tarfile.TarInfo(name=name)
+            info.size = len(content)
+            tf.addfile(info, io.BytesIO(content))
+    return str(tar_path)
+
+
+@pytest.fixture()
+def sample_tar_xz(tmp_path):
+    """Create a TAR.XZ archive for testing."""
+    tar_path = tmp_path / "sample.tar.xz"
+    with tarfile.open(tar_path, "w:xz") as tf:
+        for name, content in [
+            ("readme.txt", b"Hello World"),
+            ("images/photo.jpg", b"\xff\xd8\xff\xe0dummy-jpeg"),
+        ]:
+            info = tarfile.TarInfo(name=name)
+            info.size = len(content)
+            tf.addfile(info, io.BytesIO(content))
+    return str(tar_path)
+
+
+@pytest.fixture()
+def sample_gz(tmp_path):
+    """Create a standalone .gz file for testing."""
+    gz_path = tmp_path / "readme.txt.gz"
+    with gzip.open(gz_path, "wb") as f:
+        f.write(b"Hello World from gzip")
+    return str(gz_path)
+
+
+@pytest.fixture()
+def sample_7z(tmp_path):
+    """Create a 7Z archive for testing (requires py7zr)."""
+    if not HAS_7Z:
+        pytest.skip("py7zr not installed")
+    sz_path = tmp_path / "sample.7z"
+    with py7zr.SevenZipFile(sz_path, "w") as zf:
+        zf.writestr(b"Hello World", "readme.txt")
+        zf.writestr(b"\xff\xd8\xff\xe0dummy-jpeg", "images/photo.jpg")
+    return str(sz_path)
+
+
+@pytest.fixture()
+def mixed_archive_dir(tmp_path, sample_zip, sample_tar, sample_tar_gz):
+    """Create a directory with mixed archive types."""
+    dest = tmp_path / "mixed"
+    dest.mkdir()
+    shutil.copy(sample_zip, dest / "a.zip")
+    shutil.copy(sample_tar, dest / "b.tar")
+    shutil.copy(sample_tar_gz, dest / "c.tar.gz")
+    return str(dest)
 # User manager fixture (isolated per-test)
 # ---------------------------------------------------------------------------
 

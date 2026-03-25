@@ -1,11 +1,16 @@
 """
-ZIP file management functionality.
+Archive file management functionality.
+Supports ZIP, RAR, 7Z, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, GZ, and remote ZIP URLs.
 """
 import os
 import glob
-import pyzipper
 import urllib.parse
-from remotezip import RemoteZip
+
+from .archive_handler import (
+    open_archive,
+    is_url as _is_url,
+    ARCHIVE_GLOB_PATTERNS,
+)
 from .utils import get_zip_file_hash, is_image, is_video, should_show_file
 
 
@@ -15,18 +20,11 @@ class ZipManager:
     def __init__(self):
         self.zip_files = (
             {}
-        )  # zip_id -> {"path": path, "password": password, "zfile": pyzipper.AESZipFile or RemoteZip, "tree": dict}
+        )  # zip_id -> {"path": ..., "password": ..., "zfile": ArchiveFile, "tree": dict}
 
     def is_url(self, path):
         """Check if a path is a URL"""
-        try:
-            result = urllib.parse.urlparse(path)
-            return all([result.scheme, result.netloc]) and result.scheme in [
-                "http",
-                "https",
-            ]
-        except Exception:
-            return False
+        return _is_url(path)
 
     def read_urls_from_file(self, file_path):
         """Read URLs from a text file"""
@@ -42,64 +40,29 @@ class ZipManager:
         return urls
 
     def check_zip_requires_password(self, zip_path):
-        """Check if a ZIP file requires a password"""
+        """Check if an archive file requires a password"""
         try:
-            if self.is_url(zip_path):
-                # For remote ZIP files, use RemoteZip
-                with RemoteZip(zip_path) as zf:
-                    # Only check actual files, not directories
-                    file_entries = [f for f in zf.namelist() if not f.endswith("/")]
-                    if file_entries:
-                        # Try to read the first file without password
-                        try:
-                            zf.read(file_entries[0])
-                            return False  # No password required
-                        except (RuntimeError, Exception):
-                            return True  # Password required
-                    return False  # Empty zip or only directories
-            else:
-                # For local ZIP files, use pyzipper
-                with pyzipper.AESZipFile(zip_path, "r") as zf:
-                    # Only check actual files, not directories
-                    file_entries = [f for f in zf.namelist() if not f.endswith("/")]
-                    if file_entries:
-                        # Try to read the first file without password
-                        try:
-                            zf.read(file_entries[0])
-                            return False  # No password required
-                        except (
-                            RuntimeError,
-                            pyzipper.BadZipFile,
-                            pyzipper.LargeZipFile,
-                        ):
-                            return True  # Password required
-                    return False  # Empty zip or only directories
+            with open_archive(zip_path) as zf:
+                file_entries = [f for f in zf.namelist() if not f.endswith("/")]
+                if file_entries:
+                    try:
+                        zf.read(file_entries[0])
+                        return False
+                    except Exception:
+                        return True
+                return False
         except Exception:
             return False
 
     def validate_zip_password(self, zip_path, password):
-        """Validate if the provided password works for the ZIP file"""
+        """Validate if the provided password works for the archive file"""
         try:
-            if self.is_url(zip_path):
-                # For remote ZIP files, use RemoteZip
-                with RemoteZip(zip_path) as zf:
-                    if password:
-                        zf.setpassword(password.encode("utf-8"))
-                    # Find an actual file (not directory) to validate password
-                    file_entries = [f for f in zf.namelist() if not f.endswith("/")]
-                    if file_entries:
-                        zf.read(file_entries[0])
-                    return True
-            else:
-                # For local ZIP files, use pyzipper
-                with pyzipper.AESZipFile(zip_path, "r") as zf:
-                    if password:
-                        zf.setpassword(password.encode("utf-8"))
-                    # Find an actual file (not directory) to validate password
-                    file_entries = [f for f in zf.namelist() if not f.endswith("/")]
-                    if file_entries:
-                        zf.read(file_entries[0])
-                    return True
+            pwd = password.encode("utf-8") if password else None
+            with open_archive(zip_path, password=pwd) as zf:
+                file_entries = [f for f in zf.namelist() if not f.endswith("/")]
+                if file_entries:
+                    zf.read(file_entries[0])
+                return True
         except Exception:
             return False
 
@@ -127,7 +90,7 @@ class ZipManager:
         return zip_tree
 
     def discover_zip_files(self, zip_path):
-        """Discover ZIP files from the provided path"""
+        """Discover archive files from the provided path"""
         zip_path = zip_path.replace("\\", "/").replace('"', "")
 
         # Check if it's a URL
@@ -139,47 +102,50 @@ class ZipManager:
             urls = self.read_urls_from_file(zip_path)
             if urls:
                 return urls
-            # If no URLs found, treat as regular file (might be a zip file with .txt extension)
 
         if os.path.isfile(zip_path):
-            # Single ZIP file
             return [zip_path]
         elif os.path.isdir(zip_path):
-            # Directory - find all ZIP files
-            zip_files_list = []
-            for ext in ["*.zip", "*.iso"]:
-                zip_files_list.extend(glob.glob(os.path.join(zip_path, ext)))
-                zip_files_list.extend(
-                    glob.glob(os.path.join(zip_path, "**", ext), recursive=True)
-                )
-            return zip_files_list
+            archive_files_list = []
+            seen = set()
+            for pattern in ARCHIVE_GLOB_PATTERNS:
+                for match in glob.glob(os.path.join(zip_path, pattern)):
+                    real = os.path.realpath(match)
+                    if real not in seen:
+                        seen.add(real)
+                        archive_files_list.append(match)
+                for match in glob.glob(
+                    os.path.join(zip_path, "**", pattern), recursive=True
+                ):
+                    real = os.path.realpath(match)
+                    if real not in seen:
+                        seen.add(real)
+                        archive_files_list.append(match)
+            return archive_files_list
         else:
             return []
 
     def load_zip_file(self, zip_id, password=None):
-        """Load and cache a zip file"""
+        """Load and cache an archive file"""
         if zip_id not in self.zip_files:
             return None
 
         zip_info = self.zip_files[zip_id]
 
         try:
-            if self.is_url(zip_info["path"]):
-                # For remote ZIP files, use RemoteZip
-                zfile = RemoteZip(zip_info["path"])
-            else:
-                # For local ZIP files, use pyzipper
-                zfile = pyzipper.AESZipFile(zip_info["path"])
-
+            pwd = None
             if password:
-                zfile.setpassword(password.encode("utf-8"))
+                pwd = password.encode("utf-8")
                 zip_info["password"] = password
             elif zip_info.get("password"):
-                zfile.setpassword(zip_info["password"].encode("utf-8"))
+                pwd = zip_info["password"].encode("utf-8")
 
-            # Test the password by trying to read the first file
-            if zfile.namelist():
-                zfile.read(zfile.namelist()[0])
+            zfile = open_archive(zip_info["path"], password=pwd)
+
+            # Test by reading the first file entry
+            file_entries = [f for f in zfile.namelist() if not f.endswith("/")]
+            if file_entries:
+                zfile.read(file_entries[0])
 
             zip_info["zfile"] = zfile
             zip_info["tree"] = self.build_zip_tree(zfile)
@@ -188,25 +154,15 @@ class ZipManager:
             return None
 
     def get_zip_file_object(self, zip_id):
-        """Get a fresh zip file object for reading files (especially important for remote ZIPs)"""
+        """Get a fresh archive file object for reading files."""
         if zip_id not in self.zip_files:
             return None
 
         zip_info = self.zip_files[zip_id]
 
         try:
-            if self.is_url(zip_info["path"]):
-                # For remote ZIP files, create a new RemoteZip object each time
-                zfile = RemoteZip(zip_info["path"])
-            else:
-                # For local ZIP files, also create a new object each time to avoid "already closed" errors
-                zfile = pyzipper.AESZipFile(zip_info["path"])
-
-            # Apply password if needed
-            if zip_info.get("password"):
-                zfile.setpassword(zip_info["password"].encode("utf-8"))
-
-            return zfile
+            pwd = zip_info["password"].encode("utf-8") if zip_info.get("password") else None
+            return open_archive(zip_info["path"], password=pwd)
         except Exception:
             return None
 

@@ -1,6 +1,6 @@
 # ZIP Browser
 
-A modern, modular Flask web application for browsing and viewing files inside offline and online ZIP archives with multi-user authentication and CSRF protection.
+A modern, modular Flask web application for browsing and viewing files inside offline and online archives (ZIP, RAR, 7Z, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, GZ) with multi-user authentication and CSRF protection.
 
 ![Login](https://raw.githubusercontent.com/shhossain/zip-browser/main/images/login.png)
 ![All Zips](https://raw.githubusercontent.com/shhossain/zip-browser/main/images/all_zips.png)
@@ -35,6 +35,10 @@ A modern, modular Flask web application for browsing and viewing files inside of
 
    ```bash
    zip-browser server path/to/your/file.zip
+   # Also works with other archive formats:
+   zip-browser server path/to/archive.tar.gz
+   zip-browser server path/to/archive.7z
+   zip-browser server path/to/archive.rar
    ```
 
 4. **Access the application:**
@@ -44,9 +48,10 @@ That's it! You're ready to browse your ZIP files.
 
 ## Features
 
-- 🔒 **Password-protected ZIP** View password protected zip files.
+- � **Multiple archive formats** — ZIP, RAR, 7Z, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, GZ
+- 🔒 **Password-protected archives** — ZIP, RAR, and 7Z with password support
 - 🌐 **Remote ZIP files** - View remote zip files.
-- 📁 **Browse ZIP contents** in a clean UI.
+- 📁 **Browse archive contents** in a clean UI.
 - 👥 **Multi-user authentication** with secure password hashing
 - 🔐 **CSRF protection** and role-based access control
 - 🖼️ **Image thumbnails** and preview gallery
@@ -146,6 +151,12 @@ options:
 # Basic usage
 zip-browser server /path/to/archive.zip
 
+# Other archive formats
+zip-browser server /path/to/archive.tar.gz
+zip-browser server /path/to/archive.7z
+zip-browser server /path/to/archive.rar
+zip-browser server /path/to/archive.tar.bz2
+
 # Multiple ZIP files
 zip-browser server /path/to/zip-folder/
 
@@ -205,9 +216,23 @@ User accounts are stored in:
 ### Architecture
 
 - `app.py` - Main application factory and configuration
+- `archive_handler.py` - Unified archive interface (ZIP, RAR, 7Z, TAR, GZ)
 - `auth.py` - Authentication management with Flask-Login
 - `user_manager.py` - Multi-user management with secure password hashing
-- `zip_manager.py` - ZIP file operations and caching
+- `zip_manager.py` - Archive file operations and caching
 - `routes.py` - Route handlers and request processing
 - `utils.py` - Utility functions and helpers
 - `config.py` - Configuration management
+
+### Supported Archive Formats
+
+| Format | Extension(s) | Password Support | Library |
+|--------|-------------|-----------------|----------|
+| ZIP | `.zip`, `.iso` | ✅ AES encryption | pyzipper |
+| TAR | `.tar` | ❌ | tarfile (built-in) |
+| TAR.GZ | `.tar.gz`, `.tgz` | ❌ | tarfile (built-in) |
+| TAR.BZ2 | `.tar.bz2`, `.tbz2` | ❌ | tarfile (built-in) |
+| TAR.XZ | `.tar.xz`, `.txz` | ❌ | tarfile (built-in) |
+| GZ | `.gz` | ❌ | gzip (built-in) |
+| 7Z | `.7z` | ✅ | py7zr |
+| RAR | `.rar` | ✅ | rarfile |
