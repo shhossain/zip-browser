@@ -173,7 +173,7 @@ def create_app(config=None):
 
     # Register modular blueprints
     app.register_blueprint(create_auth_routes(auth_manager))
-    app.register_blueprint(create_browse_routes(zip_manager))
+    app.register_blueprint(create_browse_routes(zip_manager, user_manager if config.multiuser else None))
     app.register_blueprint(create_video_routes(zip_manager))
     app.register_blueprint(create_search_routes(zip_manager))
 

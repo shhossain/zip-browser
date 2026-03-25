@@ -156,12 +156,17 @@
           <div class="item-name" title="{{ item.name }}">{{ item.name }}</div>
         </div>
       {% else %}
-        <a href="{{ url_for('browse.view_file', zip_id=zip_id, path=(path + '/' + item.name) if path else item.name) }}" class="explorer-item file-item">
-          <div class="file-placeholder">
-            <span class="{{ get_file_icon(item.extension) }}"></span>
-          </div>
-          <div class="item-name" title="{{ item.name }}">{{ item.name }}</div>
-        </a>
+        <div class="explorer-item file-item" data-filepath="{{ (path + '/' + item.name) if path else item.name }}" data-zip-id="{{ zip_id }}">
+          <a href="{{ url_for('browse.view_file', zip_id=zip_id, path=(path + '/' + item.name) if path else item.name) }}" class="file-item-link">
+            <div class="file-placeholder">
+              <span class="{{ get_file_icon(item.extension) }}"></span>
+            </div>
+            <div class="item-name" title="{{ item.name }}">{{ item.name }}</div>
+          </a>
+          <button class="open-with-btn" onclick="showOpenWithMenu(event, this.parentElement)" title="Open with...">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+          </button>
+        </div>
       {% endif %}
     {% endfor %}
   </div>
@@ -239,15 +244,21 @@
           <div></div>
         </div>
       {% else %}
-        <a href="{{ url_for('browse.view_file', zip_id=zip_id, path=(path + '/' + item.name) if path else item.name) }}" target="_blank" class="explorer-item-row file-row">
-          <div class="col-name">
-            <span class="row-icon"><span class="{{ get_file_icon(item.extension) }}"></span></span>
-            <span class="item-name">{{ item.name }}</span>
+        <div class="explorer-item-row file-row" data-filepath="{{ (path + '/' + item.name) if path else item.name }}" data-zip-id="{{ zip_id }}">
+          <a href="{{ url_for('browse.view_file', zip_id=zip_id, path=(path + '/' + item.name) if path else item.name) }}" target="_blank" class="file-row-link">
+            <div class="col-name">
+              <span class="row-icon"><span class="{{ get_file_icon(item.extension) }}"></span></span>
+              <span class="item-name">{{ item.name }}</span>
+            </div>
+            <div class="col-type">{{ item.extension.upper() or 'File' }}</div>
+            <div class="col-size">-</div>
+          </a>
+          <div class="col-actions">
+            <button class="open-with-btn" onclick="showOpenWithMenu(event, this.closest('[data-filepath]'))" title="Open with...">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+            </button>
           </div>
-          <div class="col-type">{{ item.extension.upper() or 'File' }}</div>
-          <div class="col-size">-</div>
-          <div></div>
-        </a>
+        </div>
       {% endif %}
     {% endfor %}
   </div>
@@ -259,6 +270,15 @@
     <p>No files or folders found in this location.</p>
   </div>
 {% endif %}
+
+<!-- Open With context menu -->
+<div id="open-with-menu" class="open-with-menu" style="display:none;">
+  <div class="open-with-header">Open with&hellip;</div>
+  <div id="open-with-list" class="open-with-list"></div>
+  <div class="open-with-footer">
+    <label class="open-with-remember"><input type="checkbox" id="open-with-remember"> Remember for this extension</label>
+  </div>
+</div>
 
 <!-- Bottom spacing -->
 <div class="bottom-spacing"></div>
@@ -920,6 +940,95 @@
               startY = e.touches[0].clientY - translateY;
             }
           }
+        }
+      });
+
+      // ----------------------------------------------------------------
+      // Open With menu
+      // ----------------------------------------------------------------
+      let openWithTarget = null;  // {zipId, filepath}
+
+      function showOpenWithMenu(e, itemEl) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const menu = document.getElementById('open-with-menu');
+        const zipId = itemEl.dataset.zipId;
+        const filepath = itemEl.dataset.filepath;
+
+        openWithTarget = { zipId, filepath };
+
+        // Position near the button
+        const rect = e.currentTarget.getBoundingClientRect();
+        let top = rect.bottom + 4;
+        let left = rect.left;
+
+        // Keep inside viewport
+        menu.style.display = 'block';
+        const menuRect = menu.getBoundingClientRect();
+        if (left + menuRect.width > window.innerWidth) left = window.innerWidth - menuRect.width - 8;
+        if (top + menuRect.height > window.innerHeight) top = rect.top - menuRect.height - 4;
+        menu.style.top = top + 'px';
+        menu.style.left = left + 'px';
+
+        // Fetch available handlers
+        fetch('/open-with-options/' + encodeURIComponent(zipId) + '/' + filepath.split('/').map(encodeURIComponent).join('/'))
+          .then(r => r.json())
+          .then(data => {
+            const list = document.getElementById('open-with-list');
+            list.innerHTML = '';
+            data.handlers.forEach(h => {
+              const btn = document.createElement('button');
+              btn.className = 'open-with-option' + (data.saved === h.id ? ' saved' : '');
+              btn.textContent = h.label + (data.saved === h.id ? ' ✓' : '');
+              btn.onclick = () => handleOpenWith(h.id);
+              list.appendChild(btn);
+            });
+            document.getElementById('open-with-remember').checked = false;
+          })
+          .catch(() => { menu.style.display = 'none'; });
+      }
+
+      function handleOpenWith(handler) {
+        const menu = document.getElementById('open-with-menu');
+        menu.style.display = 'none';
+
+        if (!openWithTarget) return;
+        const { zipId, filepath } = openWithTarget;
+
+        // Save preference if checkbox is checked
+        const remember = document.getElementById('open-with-remember').checked;
+        if (remember) {
+          const ext = '.' + filepath.split('.').pop().toLowerCase();
+          fetch('/save-open-with', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ extension: ext, handler: handler })
+          });
+        }
+
+        if (handler === 'default') {
+          window.open('/view/' + encodeURIComponent(zipId) + '/' + filepath.split('/').map(encodeURIComponent).join('/'), '_blank');
+        } else {
+          window.open('/open-with/' + handler + '/' + encodeURIComponent(zipId) + '/' + filepath.split('/').map(encodeURIComponent).join('/'), '_blank');
+        }
+      }
+
+      // Close menu when clicking outside
+      document.addEventListener('click', function(e) {
+        const menu = document.getElementById('open-with-menu');
+        if (menu.style.display === 'block' && !menu.contains(e.target) && !e.target.closest('.open-with-btn')) {
+          menu.style.display = 'none';
+        }
+      });
+
+      // Also support right-click on file items to show the menu
+      document.addEventListener('contextmenu', function(e) {
+        const fileItem = e.target.closest('[data-filepath]');
+        if (fileItem) {
+          e.preventDefault();
+          const btn = fileItem.querySelector('.open-with-btn');
+          if (btn) showOpenWithMenu(e, fileItem);
         }
       });
 </script>

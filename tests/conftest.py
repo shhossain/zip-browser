@@ -311,7 +311,7 @@ def app(sample_zip, user_manager, auth_manager):
     zm.initialize_zip_files([sample_zip])
 
     flask_app.register_blueprint(create_auth_routes(auth_manager))
-    flask_app.register_blueprint(create_browse_routes(zm))
+    flask_app.register_blueprint(create_browse_routes(zm, user_manager))
     flask_app.register_blueprint(create_video_routes(zm))
     flask_app.register_blueprint(create_search_routes(zm))
 

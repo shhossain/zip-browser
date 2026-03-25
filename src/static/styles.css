@@ -1817,3 +1817,110 @@ body {
   padding: 3rem;
 }
 
+/* Open With menu */
+.open-with-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg, 0 4px 24px rgba(0,0,0,.18));
+  min-width: 170px;
+  padding: 0.25rem 0;
+  font-size: 0.875rem;
+}
+.open-with-header {
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-weight: 600;
+  color: var(--text-light);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}
+.open-with-list {
+  display: flex;
+  flex-direction: column;
+}
+.open-with-option {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.4rem 0.75rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 0.875rem;
+  transition: background 0.15s;
+}
+.open-with-option:hover {
+  background: var(--primary-light, #eef2ff);
+}
+.open-with-option.saved {
+  color: var(--primary);
+  font-weight: 600;
+}
+.open-with-footer {
+  border-top: 1px solid var(--border);
+  padding: 0.4rem 0.75rem;
+  margin-top: 0.25rem;
+}
+.open-with-remember {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+.open-with-remember input { margin: 0; }
+
+/* Open-with button on file items */
+.open-with-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: var(--text-light);
+  z-index: 2;
+  line-height: 1;
+}
+.explorer-item:hover .open-with-btn,
+.explorer-item-row:hover .open-with-btn {
+  opacity: 1;
+}
+.open-with-btn:hover {
+  background: var(--primary-light, #eef2ff);
+  color: var(--primary);
+}
+
+/* File item as container (for open-with positioning) */
+.explorer-item.file-item {
+  position: relative;
+}
+.file-item-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  width: 100%;
+}
+.file-row-link {
+  display: contents;
+  text-decoration: none;
+  color: inherit;
+}
+.explorer-item-row .col-actions {
+  position: relative;
+  width: 28px;
+}
+.explorer-item-row {
+  position: relative;
+}
+

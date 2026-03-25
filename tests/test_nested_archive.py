@@ -335,7 +335,7 @@ class TestNestedArchiveRoutes:
         zm.initialize_zip_files([nested_zip])
 
         flask_app.register_blueprint(create_auth_routes(auth_manager))
-        flask_app.register_blueprint(create_browse_routes(zm))
+        flask_app.register_blueprint(create_browse_routes(zm, user_manager))
         flask_app.register_blueprint(create_video_routes(zm))
         flask_app.register_blueprint(create_search_routes(zm))
 
@@ -425,7 +425,7 @@ class TestNestedArchiveRoutes:
         zm.initialize_zip_files([nested_password_zip])
 
         flask_app.register_blueprint(create_auth_routes(auth_manager))
-        flask_app.register_blueprint(create_browse_routes(zm))
+        flask_app.register_blueprint(create_browse_routes(zm, user_manager))
         flask_app.register_blueprint(create_video_routes(zm))
         flask_app.register_blueprint(create_search_routes(zm))
 

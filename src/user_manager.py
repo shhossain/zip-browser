@@ -173,6 +173,45 @@ class UserManager:
             users[username]['last_login'] = datetime.now().isoformat()
             self._save_users(users)
 
+    # ------------------------------------------------------------------
+    # User preferences
+    # ------------------------------------------------------------------
+
+    def get_preferences(self, username: str) -> Dict:
+        """Return the preferences dict for *username* (empty dict if none)."""
+        users = self._load_users()
+        user = users.get(username)
+        if not user:
+            return {}
+        return user.get('preferences', {})
+
+    def set_preference(self, username: str, key: str, value) -> bool:
+        """Set a single preference *key* to *value* for *username*."""
+        users = self._load_users()
+        if username not in users:
+            return False
+        users[username].setdefault('preferences', {})[key] = value
+        users[username]['updated_at'] = datetime.now().isoformat()
+        self._save_users(users)
+        return True
+
+    def get_open_with_prefs(self, username: str) -> Dict:
+        """Return the ``open_with`` mapping ``{ext: handler}``."""
+        prefs = self.get_preferences(username)
+        return prefs.get('open_with', {})
+
+    def set_open_with_pref(self, username: str, extension: str, handler: str) -> bool:
+        """Persist the user's preferred *handler* for files with *extension*."""
+        users = self._load_users()
+        if username not in users:
+            return False
+        prefs = users[username].setdefault('preferences', {})
+        ow = prefs.setdefault('open_with', {})
+        ow[extension.lower()] = handler
+        users[username]['updated_at'] = datetime.now().isoformat()
+        self._save_users(users)
+        return True
+
     def change_password(self, username: str, old_password: str, new_password: str) -> bool:
         """Change user password after validating old password"""
         if not self.validate_credentials(username, old_password):

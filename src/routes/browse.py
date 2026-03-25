@@ -22,9 +22,22 @@ from ..archive_handler import is_nested_archive
 from ..cache_manager import cache_manager
 
 
-def create_browse_routes(zip_manager):
+def create_browse_routes(zip_manager, user_manager=None):
     """Create browsing and file viewing routes."""
     bp = Blueprint("browse", __name__)
+
+    # Valid "open with" handler names and the MIME types they map to
+    OPEN_WITH_HANDLERS = {
+        "text": "text/plain",
+        "image": "image/png",
+        "video": "video/mp4",
+        "audio": "audio/mpeg",
+        "pdf": "application/pdf",
+        "html": "text/html",
+        "archive": None,   # special: redirect to nested-archive flow
+        "download": "application/octet-stream",
+        "default": None,   # use the normal guessed MIME type
+    }
 
     @bp.route("/zips")
     @login_required
@@ -258,6 +271,108 @@ def create_browse_routes(zip_manager):
         session_id = request.cookies.get('session', 'default')
         cache_manager.release_folder_cache(session_id, zip_id, path)
         return jsonify({"success": True})
+
+    # ------------------------------------------------------------------
+    # Open With — serve a file forced to a specific handler / MIME type
+    # ------------------------------------------------------------------
+
+    @bp.route("/open-with/<handler>/<zip_id>/<path:path>")
+    @login_required
+    def open_with(handler, zip_id, path):
+        """Serve a file using the requested *handler* type.
+
+        ``handler`` must be one of the keys in ``OPEN_WITH_HANDLERS``.
+        """
+        if handler not in OPEN_WITH_HANDLERS:
+            abort(400)
+
+        # "archive" handler → redirect to the browse route (nested archive flow)
+        if handler == "archive":
+            from flask import redirect, url_for
+            return redirect(url_for("browse.browse", zip_id=zip_id, path=path))
+
+        zip_info = zip_manager.get_zip_info(zip_id)
+        if not zip_info:
+            abort(404)
+        if not zip_info["zfile"]:
+            if not zip_manager.load_zip_file(zip_id):
+                abort(404)
+
+        try:
+            zfile = zip_manager.get_zip_file_object(zip_id)
+            if not zfile:
+                abort(404)
+
+            data = zfile.read(path)
+
+            if handler == "default":
+                mime, _ = mimetypes.guess_type(path)
+                mime = mime or "application/octet-stream"
+            else:
+                mime = OPEN_WITH_HANDLERS[handler]
+
+            return send_file(io.BytesIO(data), mimetype=mime)
+        except Exception:
+            abort(404)
+        finally:
+            if "zfile" in locals() and hasattr(zfile, "close"):
+                try:
+                    zfile.close()
+                except Exception:
+                    pass
+
+    @bp.route("/open-with-options/<zip_id>/<path:path>")
+    @login_required
+    def open_with_options(zip_id, path):
+        """Return the list of available open-with handlers for a file,
+        together with the user's saved preference (if any)."""
+        from flask_login import current_user
+
+        ext = os.path.splitext(path.lower())[1]
+
+        saved_handler = None
+        if user_manager and hasattr(current_user, 'username'):
+            ow_prefs = user_manager.get_open_with_prefs(current_user.username)
+            saved_handler = ow_prefs.get(ext)
+
+        handlers = [
+            {"id": "default", "label": "Default"},
+            {"id": "text", "label": "Text"},
+            {"id": "image", "label": "Image"},
+            {"id": "video", "label": "Video"},
+            {"id": "audio", "label": "Audio"},
+            {"id": "pdf", "label": "PDF"},
+            {"id": "html", "label": "HTML"},
+            {"id": "download", "label": "Download"},
+        ]
+
+        if is_nested_archive(path):
+            handlers.append({"id": "archive", "label": "Browse as Archive"})
+
+        return jsonify({
+            "handlers": handlers,
+            "saved": saved_handler,
+            "extension": ext,
+        })
+
+    @bp.route("/save-open-with", methods=["POST"])
+    @login_required
+    def save_open_with():
+        """Save the user's preferred open-with handler for an extension."""
+        from flask_login import current_user
+
+        if not user_manager:
+            return jsonify({"success": False, "error": "Preferences not available"}), 400
+
+        data = request.get_json(silent=True) or {}
+        extension = data.get("extension", "").lower().strip()
+        handler = data.get("handler", "").strip()
+
+        if not extension or handler not in OPEN_WITH_HANDLERS:
+            return jsonify({"success": False, "error": "Invalid parameters"}), 400
+
+        ok = user_manager.set_open_with_pref(current_user.username, extension, handler)
+        return jsonify({"success": ok})
 
     return bp
 
