@@ -18,7 +18,7 @@ from flask_login import login_required
 from PIL import Image
 
 from ..utils import is_image, is_video, validate_pagination_params, is_system_file
-from ..archive_handler import is_nested_archive
+from ..archive_handlers import is_nested_archive
 from ..cache_manager import cache_manager
 
 

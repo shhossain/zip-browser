@@ -2,11 +2,9 @@
 Tests for nested archive support — archives inside archives.
 """
 import os
-import zipfile
-
 import pytest
 
-from src.archive_handler import is_nested_archive, is_supported_archive
+from src.archive_handlers import is_nested_archive, is_supported_archive
 from src.zip_manager import ZipManager
 from src.utils import get_zip_file_hash
 

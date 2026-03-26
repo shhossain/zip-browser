@@ -216,7 +216,7 @@ User accounts are stored in:
 ### Architecture
 
 - `app.py` - Main application factory and configuration
-- `archive_handler.py` - Unified archive interface (ZIP, RAR, 7Z, TAR, GZ)
+- `archive_handlers` - Unified archive interface (ZIP, RAR, 7Z, TAR, GZ)
 - `auth.py` - Authentication management with Flask-Login
 - `user_manager.py` - Multi-user management with secure password hashing
 - `zip_manager.py` - Archive file operations and caching

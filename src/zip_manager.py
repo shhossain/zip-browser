@@ -8,8 +8,7 @@ import glob
 import hashlib
 import tempfile
 import urllib.parse
-
-from .archive_handler import (
+from .archive_handlers import (
     open_archive,
     is_url as _is_url,
     is_nested_archive,
@@ -108,6 +107,11 @@ class ZipManager:
         # Check if it's a URL
         if self.is_url(zip_path):
             return [zip_path]
+        
+        # Check if exists
+        if not os.path.exists(zip_path):
+            print("File does not exists")
+            return []
 
         # Check if it's a text file containing URLs
         if os.path.isfile(zip_path) and zip_path.lower().endswith(".txt"):
@@ -117,8 +121,19 @@ class ZipManager:
 
         if os.path.isfile(zip_path):
             return [zip_path]
+        
         elif os.path.isdir(zip_path):
             archive_files_list = []
+            # Include the directory for filesystem browsing if readable
+            try:
+                os.listdir(zip_path)
+                archive_files_list.append(zip_path)
+            except OSError:
+                print(
+                    f"Warning: Cannot list directory '{zip_path}' (permission denied). "
+                    f"On macOS, grant Full Disk Access to your terminal app "
+                    f"in System Settings > Privacy & Security > Full Disk Access."
+                )
             seen = set()
             for pattern in ARCHIVE_GLOB_PATTERNS:
                 for match in glob.glob(os.path.join(zip_path, pattern)):

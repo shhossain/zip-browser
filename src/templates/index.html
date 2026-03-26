@@ -319,9 +319,23 @@
       <div class="loading-spinner"></div>
       <span>Loading video...</span>
     </div>
-    <video id="video-element" controls autoplay>
+    <video id="video-element" controls autoplay crossorigin="anonymous">
       Your browser does not support the video tag.
     </video>
+    <!-- Audio track selector (only visible for multi-audio files) -->
+    <div class="video-audio-bar" id="video-audio-bar" style="display:none;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+      <select id="audio-track-select" onchange="switchAudioTrack()"></select>
+    </div>
+    <!-- Custom seek bar showing real duration -->
+    <div class="video-seek-bar" id="video-seek-bar" style="display:none;">
+      <span class="seek-time" id="seek-time-current">0:00</span>
+      <div class="seek-track" id="seek-track">
+        <div class="seek-buffered" id="seek-buffered"></div>
+        <div class="seek-progress" id="seek-progress"></div>
+      </div>
+      <span class="seek-time" id="seek-time-total">0:00</span>
+    </div>
   </div>
   <div class="video-title" id="video-title"></div>
 </div>
@@ -409,6 +423,10 @@
       }
 
       // Video Player Functions
+      let _currentVideoInfo = null;
+      let _seekOffset = 0;  // seconds into the real timeline where the stream starts
+      let _totalDuration = 0;
+
       function openVideoPlayer(filename) {
         const dirPath = "{{ path }}";
         const videoPath = (dirPath ? dirPath + "/" : "") + filename;
@@ -418,58 +436,181 @@
         const videoPlayer = document.getElementById("video-player");
         const videoLoading = document.getElementById("video-loading");
         
-        // Show loading state
         videoPlayer.style.display = "flex";
         document.body.style.overflow = "hidden";
         videoTitle.textContent = filename;
         if (videoLoading) videoLoading.style.display = "flex";
         videoElement.style.opacity = "0";
+
+        _currentVideoInfo = null;
+        _seekOffset = 0;
+        _totalDuration = 0;
+        document.getElementById("video-audio-bar").style.display = "none";
+        document.getElementById("video-seek-bar").style.display = "none";
+        _clearTracks(videoElement);
         
-        // Check if video needs transcoding
         fetch("{{ url_for('video.video_info', zip_id=zip_id, path='') }}" + videoPath)
           .then(res => res.json())
           .then(info => {
-            videoElement.src = info.stream_url;
-            
+            _currentVideoInfo = info;
+            _totalDuration = info.duration || 0;
+            _seekOffset = 0;
+            _loadVideoSource(videoElement, info, 0, 0);
+            _setupAudioSelector(info.audio_tracks || []);
+            _addSubtitleTracks(videoElement, info.subtitle_tracks || []);
+            _initSeekBar();
+
             videoElement.onloadeddata = function() {
               if (videoLoading) videoLoading.style.display = "none";
               videoElement.style.opacity = "1";
             };
             
             videoElement.onerror = function() {
-              // Fallback to direct URL if streaming fails
               if (videoElement.src !== info.direct_url) {
-                console.log("Streaming failed, trying direct URL");
                 videoElement.src = info.direct_url;
-              } else {
-                if (videoLoading) {
-                  videoLoading.innerHTML = '<span style="color: #ef4444;">Failed to load video. Format may not be supported.</span>';
-                }
+              } else if (videoLoading) {
+                videoLoading.innerHTML = '<span style="color: #ef4444;">Failed to load video.</span>';
               }
             };
-            
-            videoElement.play().catch(err => {
-              console.log("Autoplay prevented:", err);
-            });
+
+            videoElement.play().catch(() => {});
           })
-          .catch(err => {
-            // Fallback to direct file serving
+          .catch(() => {
             const fullPath = "{{ url_for('browse.view_file', zip_id=zip_id, path='') }}" + videoPath;
             videoElement.src = fullPath;
             if (videoLoading) videoLoading.style.display = "none";
             videoElement.style.opacity = "1";
-            videoElement.play().catch(e => console.log("Autoplay prevented:", e));
+            videoElement.play().catch(() => {});
           });
       }
       
       function closeVideoPlayer() {
         const videoElement = document.getElementById("video-element");
-        const videoPlayer = document.getElementById("video-player");
-        
         videoElement.pause();
+        videoElement.removeEventListener("timeupdate", _onTimeUpdate);
+        _clearTracks(videoElement);
         videoElement.src = "";
-        videoPlayer.style.display = "none";
+        document.getElementById("video-player").style.display = "none";
         document.body.style.overflow = "";
+        _currentVideoInfo = null;
+        _seekOffset = 0;
+        _totalDuration = 0;
+      }
+
+      // --- Helpers ---
+
+      function _buildStreamUrl(info, audioIdx, seekTime) {
+        let url = info.stream_url;
+        const sep = url.includes("?") ? "&" : "?";
+        url += sep + "audio=" + (audioIdx || 0);
+        if (seekTime > 0) url += "&ss=" + seekTime;
+        return url;
+      }
+
+      function _loadVideoSource(videoEl, info, audioIdx, seekTime) {
+        _seekOffset = seekTime || 0;
+        videoEl.src = _buildStreamUrl(info, audioIdx, seekTime);
+      }
+
+      // --- Seek bar ---
+
+      function _fmtTime(s) {
+        s = Math.max(0, Math.floor(s));
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        if (h > 0) return h + ":" + String(m).padStart(2,"0") + ":" + String(sec).padStart(2,"0");
+        return m + ":" + String(sec).padStart(2,"0");
+      }
+
+      function _onTimeUpdate() {
+        if (!_totalDuration) return;
+        const realPos = _seekOffset + (document.getElementById("video-element").currentTime || 0);
+        const pct = Math.min(100, (realPos / _totalDuration) * 100);
+        document.getElementById("seek-progress").style.width = pct + "%";
+        document.getElementById("seek-time-current").textContent = _fmtTime(realPos);
+      }
+
+      function _initSeekBar() {
+        const bar = document.getElementById("video-seek-bar");
+        if (!_totalDuration || !_currentVideoInfo?.needs_transcoding) {
+          bar.style.display = "none";
+          return;
+        }
+        bar.style.display = "flex";
+        document.getElementById("seek-time-total").textContent = _fmtTime(_totalDuration);
+        document.getElementById("seek-time-current").textContent = _fmtTime(0);
+        document.getElementById("seek-progress").style.width = "0%";
+        document.getElementById("seek-buffered").style.width = "0%";
+
+        const videoEl = document.getElementById("video-element");
+        videoEl.removeEventListener("timeupdate", _onTimeUpdate);
+        videoEl.addEventListener("timeupdate", _onTimeUpdate);
+
+        const track = document.getElementById("seek-track");
+        track.onclick = function(e) {
+          const rect = track.getBoundingClientRect();
+          const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+          const targetTime = pct * _totalDuration;
+          _seekTo(targetTime);
+        };
+      }
+
+      function _seekTo(time) {
+        const info = _currentVideoInfo;
+        if (!info) return;
+        const videoEl = document.getElementById("video-element");
+        const audioIdx = document.getElementById("audio-track-select").value || 0;
+        const loading = document.getElementById("video-loading");
+        if (loading) { loading.style.display = "flex"; loading.innerHTML = '<div class="loading-spinner"></div><span>Seeking...</span>'; }
+        videoEl.style.opacity = "0.3";
+        _loadVideoSource(videoEl, info, audioIdx, time);
+        videoEl.onloadeddata = function() {
+          if (loading) loading.style.display = "none";
+          videoEl.style.opacity = "1";
+        };
+        videoEl.play().catch(() => {});
+      }
+
+      function _setupAudioSelector(tracks) {
+        const bar = document.getElementById("video-audio-bar");
+        const select = document.getElementById("audio-track-select");
+        select.innerHTML = "";
+        if (tracks.length <= 1) { bar.style.display = "none"; return; }
+        tracks.forEach(t => {
+          const opt = document.createElement("option");
+          opt.value = t.index;
+          opt.textContent = t.label;
+          select.appendChild(opt);
+        });
+        bar.style.display = "flex";
+      }
+
+      function switchAudioTrack() {
+        const info = _currentVideoInfo;
+        if (!info) return;
+        const videoEl = document.getElementById("video-element");
+        const audioIdx = document.getElementById("audio-track-select").value;
+        const realPos = _seekOffset + (videoEl.currentTime || 0);
+        _loadVideoSource(videoEl, info, audioIdx, realPos);
+        videoEl.play().catch(() => {});
+      }
+
+      function _addSubtitleTracks(videoEl, tracks) {
+        // Add <track> elements — browser shows native CC button
+        tracks.forEach(t => {
+          if (!t.vtt_url) return;
+          const track = document.createElement("track");
+          track.kind = "subtitles";
+          track.label = t.label;
+          track.srclang = t.lang || "und";
+          track.src = t.vtt_url;
+          videoEl.appendChild(track);
+        });
+      }
+
+      function _clearTracks(videoEl) {
+        videoEl.querySelectorAll("track").forEach(t => t.remove());
       }
 
       // Video thumbnail GIF preview on hover/touch

@@ -1,11 +1,10 @@
 """
-Video processing routes for streaming, transcoding, and thumbnails.
-Uses non-blocking FFmpeg with improved timeout handling.
+Video processing routes for streaming, transcoding, thumbnails,
+audio track selection, and subtitle extraction.
 """
 
 import os
 import subprocess
-import threading
 from flask import (
     Blueprint,
     request,
@@ -17,202 +16,93 @@ from flask import (
     Response,
 )
 from flask_login import login_required
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 from ..utils import needs_transcoding
 from ..cache_manager import cache_manager
+from ..ffmpeg_utils import (
+    FFMPEG_AVAILABLE,
+    FFMPEG_EXECUTOR,
+    FFMPEG_LOCK,
+    TEXT_SUB_CODECS,
+    probe_full_info,
+    get_duration,
+    build_stream_args,
+    extract_subtitles,
+    extract_thumbnail,
+    create_gif_preview,
+)
 
 
-def check_ffmpeg_available():
-    """Check if FFmpeg is available on the system"""
-    try:
-        result = subprocess.run(
-            ["ffmpeg", "-version"],
-            capture_output=True,
-            timeout=5
-        )
-        return result.returncode == 0
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        return False
+def _extract_to_tempfile(zip_manager, zip_id, path):
+    """Extract a file from the archive to a temp file. Returns path or None."""
+    zip_info = zip_manager.get_zip_info(zip_id)
+    if not zip_info:
+        return None
+    if not zip_info["zfile"] and not zip_manager.load_zip_file(zip_id):
+        return None
 
+    zfile = zip_manager.get_zip_file_object(zip_id)
+    if not zfile:
+        return None
 
-FFMPEG_AVAILABLE = check_ffmpeg_available()
+    data = zfile.read(path)
+    if hasattr(zfile, "close"):
+        zfile.close()
 
-# Use a thread pool for FFmpeg operations (max 2 concurrent)
-FFMPEG_EXECUTOR = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ffmpeg")
-
-# Lock for FFmpeg operations
-FFMPEG_LOCK = threading.Lock()
-
-
-def _run_ffmpeg_with_timeout(args, timeout=60):
-    """Run FFmpeg with proper timeout handling."""
-    try:
-        process = subprocess.Popen(
-            args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-        )
-        try:
-            stdout, stderr = process.communicate(timeout=timeout)
-            return process.returncode, stdout, stderr
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait()
-            return -1, b"", b"Timeout"
-    except Exception as e:
-        return -1, b"", str(e).encode()
-
-
-def _transcode_video_sync(input_path, output_path):
-    """Transcode video synchronously with timeout."""
-    args = [
-        "ffmpeg",
-        "-i", input_path,
-        "-c:v", "libx264",
-        "-preset", "ultrafast",  # Fastest preset for quick start
-        "-tune", "zerolatency",  # Optimize for streaming
-        "-crf", "28",
-        "-c:a", "aac",
-        "-b:a", "96k",
-        "-movflags", "+faststart+frag_keyframe+empty_moov",  # Enable streaming
-        "-threads", "2",
-        "-y",
-        output_path
-    ]
-    return _run_ffmpeg_with_timeout(args, timeout=120)
-
-
-def _extract_thumbnail_sync(input_path, output_path, seek_time=0):
-    """Extract a single thumbnail from video."""
-    args = [
-        "ffmpeg",
-        "-ss", str(seek_time),
-        "-i", input_path,
-        "-vframes", "1",
-        "-vf", "scale=320:-1",
-        "-q:v", "5",  # Lower quality for speed
-        "-y",
-        output_path
-    ]
-    return _run_ffmpeg_with_timeout(args, timeout=15)
-
-
-def _create_gif_preview_sync(input_path, output_path, duration=10):
-    """Create a simple GIF preview - optimized for speed."""
-    # Simpler, faster GIF generation
-    args = [
-        "ffmpeg",
-        "-i", input_path,
-        "-vf", "fps=3,scale=160:-1:flags=fast_bilinear",
-        "-t", "4",  # Only 4 seconds
-        "-y",
-        output_path
-    ]
-    return _run_ffmpeg_with_timeout(args, timeout=30)
-
-
-def _get_video_duration(input_path):
-    """Get video duration quickly."""
-    args = [
-        "ffprobe",
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
-        input_path
-    ]
-    returncode, stdout, _ = _run_ffmpeg_with_timeout(args, timeout=5)
-    if returncode == 0:
-        try:
-            return float(stdout.decode().strip())
-        except (ValueError, UnicodeDecodeError):
-            pass
-    return 0
+    ext = os.path.splitext(path)[1]
+    temp_path = cache_manager.get_temp_path(ext)
+    with open(temp_path, "wb") as f:
+        f.write(data)
+    return temp_path
 
 
 def create_video_routes(zip_manager):
     """Create video-related routes."""
     bp = Blueprint("video", __name__)
 
+    # ------------------------------------------------------------------
+    # Streaming
+    # ------------------------------------------------------------------
+
     @bp.route("/stream/<zip_id>/<path:path>")
     @login_required
     def stream_video(zip_id, path):
-        """Stream video with real-time FFmpeg transcoding for unsupported formats."""
-        zip_info = zip_manager.get_zip_info(zip_id)
-        if not zip_info:
-            abort(404)
+        """Stream video with real-time FFmpeg transcoding."""
+        if not needs_transcoding(path) or not FFMPEG_AVAILABLE:
+            return redirect(url_for("browse.view_file", zip_id=zip_id, path=path))
 
-        if not zip_info["zfile"]:
-            if not zip_manager.load_zip_file(zip_id):
-                abort(404)
-
-        # For browser-native formats, serve directly
-        if not needs_transcoding(path):
-            return redirect(url_for('browse.view_file', zip_id=zip_id, path=path))
-
-        if not FFMPEG_AVAILABLE:
-            return redirect(url_for('browse.view_file', zip_id=zip_id, path=path))
-
-        # Get session ID for tracking
-        session_id = request.cookies.get('session', 'default')
-        
-        # Check cache first - if already transcoded, serve from cache
+        session_id = request.cookies.get("session", "default")
         cache_path = cache_manager.get_video_cache_path(zip_id, path)
-        
         if cache_manager.cache_exists(cache_path):
             cache_manager.track_file_access(session_id, cache_path)
             return send_file(cache_path, mimetype="video/mp4", conditional=True)
 
-        # Extract video from zip first
-        zfile = zip_manager.get_zip_file_object(zip_id)
-        if not zfile:
+        temp_input = _extract_to_tempfile(zip_manager, zip_id, path)
+        if not temp_input:
             abort(404)
 
-        video_data = zfile.read(path)
-        if hasattr(zfile, "close"):
-            zfile.close()
+        audio_track_idx = request.args.get("audio", 0, type=int)
+        seek_time = request.args.get("ss", 0, type=float)
+        info = probe_full_info(temp_input)
+        ffmpeg_args = build_stream_args(
+            temp_input, info=info, audio_track_idx=audio_track_idx, seek_time=seek_time
+        )
 
-        # Create temp input file
-        ext = os.path.splitext(path)[1]
-        temp_input = cache_manager.get_temp_path(ext)
-        
-        with open(temp_input, 'wb') as f:
-            f.write(video_data)
-
-        def generate_stream():
-            """Generator that streams FFmpeg output directly."""
+        def generate():
             process = None
             try:
-                # Use fragmented MP4 for live streaming (no seek required)
-                args = [
-                    "ffmpeg",
-                    "-i", temp_input,
-                    "-c:v", "libx264",
-                    "-preset", "ultrafast",
-                    "-tune", "zerolatency",
-                    "-crf", "28",
-                    "-c:a", "aac",
-                    "-b:a", "96k",
-                    "-movflags", "frag_keyframe+empty_moov+default_base_moof",
-                    "-f", "mp4",
-                    "-threads", "2",
-                    "pipe:1"  # Output to stdout
-                ]
-                
                 process = subprocess.Popen(
-                    args,
+                    ffmpeg_args,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.DEVNULL,
-                    bufsize=8192
+                    bufsize=8192,
                 )
-                
-                # Stream chunks as they become available
                 while True:
                     chunk = process.stdout.read(8192)
                     if not chunk:
                         break
                     yield chunk
-                    
             except Exception as e:
                 print(f"Streaming error: {e}")
             finally:
@@ -222,98 +112,143 @@ def create_video_routes(zip_manager):
                         process.wait(timeout=5)
                     except Exception:
                         process.kill()
-                # Clean up temp file
                 try:
                     os.unlink(temp_input)
                 except Exception:
                     pass
 
         return Response(
-            generate_stream(),
+            generate(),
             mimetype="video/mp4",
-            headers={
-                "Content-Type": "video/mp4",
-                "Cache-Control": "no-cache",
-            }
+            headers={"Content-Type": "video/mp4", "Cache-Control": "no-cache"},
         )
+
+    # ------------------------------------------------------------------
+    # Video info (tracks, codecs, URLs)
+    # ------------------------------------------------------------------
 
     @bp.route("/video-info/<zip_id>/<path:path>")
     @login_required
     def video_info(zip_id, path):
-        """Get video information including whether transcoding is needed."""
-        return jsonify({
-            "needs_transcoding": needs_transcoding(path),
+        """Return detailed video info: codecs, audio tracks, subtitle tracks."""
+        transcode = needs_transcoding(path)
+        can_stream = transcode and FFMPEG_AVAILABLE
+
+        base_response = {
+            "needs_transcoding": transcode,
             "ffmpeg_available": FFMPEG_AVAILABLE,
-            "stream_url": url_for('video.stream_video', zip_id=zip_id, path=path) if needs_transcoding(path) and FFMPEG_AVAILABLE else url_for('browse.view_file', zip_id=zip_id, path=path),
-            "direct_url": url_for('browse.view_file', zip_id=zip_id, path=path)
-        })
+            "stream_url": (
+                url_for("video.stream_video", zip_id=zip_id, path=path)
+                if can_stream
+                else url_for("browse.view_file", zip_id=zip_id, path=path)
+            ),
+            "direct_url": url_for("browse.view_file", zip_id=zip_id, path=path),
+            "duration": None,
+            "audio_tracks": [],
+            "subtitle_tracks": [],
+        }
+
+        if not can_stream:
+            return jsonify(base_response)
+
+        # Probe the file for tracks
+        temp_input = _extract_to_tempfile(zip_manager, zip_id, path)
+        if not temp_input:
+            return jsonify(base_response)
+
+        try:
+            info = probe_full_info(temp_input)
+
+            # Extract subtitles in the background and cache the VTT files
+            sub_dir = cache_manager.get_sub_cache_dir(zip_id, path)
+            os.makedirs(sub_dir, exist_ok=True)
+            extract_subtitles(temp_input, sub_dir, info["subtitle_tracks"])
+
+            base_response["duration"] = info.get("duration")
+            base_response["audio_tracks"] = [
+                {"index": i, "label": t["label"], "lang": t.get("lang"), "codec": t.get("codec")}
+                for i, t in enumerate(info["audio_tracks"])
+            ]
+            base_response["subtitle_tracks"] = [
+                {
+                    "index": i,
+                    "label": t["label"],
+                    "lang": t.get("lang"),
+                    "codec": t.get("codec"),
+                    "vtt_url": (
+                        url_for("video.subtitle_track", zip_id=zip_id, path=path, index=i)
+                        if t.get("codec") in TEXT_SUB_CODECS
+                        else None
+                    ),
+                }
+                for i, t in enumerate(info["subtitle_tracks"])
+            ]
+        finally:
+            try:
+                os.unlink(temp_input)
+            except Exception:
+                pass
+
+        return jsonify(base_response)
+
+    # ------------------------------------------------------------------
+    # Subtitle serving
+    # ------------------------------------------------------------------
+
+    @bp.route("/video-sub/<zip_id>/<int:index>/<path:path>")
+    @login_required
+    def subtitle_track(zip_id, index, path):
+        """Serve an extracted WebVTT subtitle file."""
+        sub_dir = cache_manager.get_sub_cache_dir(zip_id, path)
+        vtt_file = os.path.join(sub_dir, f"sub_{index}.vtt")
+        if not os.path.exists(vtt_file):
+            abort(404)
+        return send_file(vtt_file, mimetype="text/vtt")
+
+    # ------------------------------------------------------------------
+    # Thumbnails
+    # ------------------------------------------------------------------
 
     @bp.route("/video-thumb/<zip_id>/<path:path>")
     @login_required
     def video_thumbnail(zip_id, path):
-        """Generate a static thumbnail for a video."""
-        zip_info = zip_manager.get_zip_info(zip_id)
-        if not zip_info or not FFMPEG_AVAILABLE:
+        """Generate a static JPEG thumbnail for a video."""
+        if not FFMPEG_AVAILABLE:
             abort(404)
 
-        if not zip_info["zfile"]:
-            if not zip_manager.load_zip_file(zip_id):
-                abort(404)
-
-        session_id = request.cookies.get('session', 'default')
+        session_id = request.cookies.get("session", "default")
         cache_path = cache_manager.get_thumb_cache_path(zip_id, path, "static")
-        
         if cache_manager.cache_exists(cache_path):
             cache_manager.track_file_access(session_id, cache_path)
             return send_file(cache_path, mimetype="image/jpeg")
 
-        # Don't block on thumbnail generation - use quick timeout
         if not FFMPEG_LOCK.acquire(timeout=2):
             abort(503)
 
         try:
-            zfile = zip_manager.get_zip_file_object(zip_id)
-            if not zfile:
+            temp_input = _extract_to_tempfile(zip_manager, zip_id, path)
+            if not temp_input:
                 abort(404)
-
-            video_data = zfile.read(path)
-            if hasattr(zfile, "close"):
-                zfile.close()
-
-            ext = os.path.splitext(path)[1]
-            temp_input = cache_manager.get_temp_path(ext)
-            
             try:
-                with open(temp_input, 'wb') as f:
-                    f.write(video_data)
+                duration = get_duration(temp_input)
+                seek = min(duration * 0.1, 1.0) if duration > 0 else 0
 
-                # Get duration for seek position
-                duration = _get_video_duration(temp_input)
-                seek_time = min(duration * 0.1, 1.0) if duration > 0 else 0
-
-                # Extract thumbnail with timeout
-                future = FFMPEG_EXECUTOR.submit(
-                    _extract_thumbnail_sync, temp_input, cache_path, seek_time
-                )
-                
+                future = FFMPEG_EXECUTOR.submit(extract_thumbnail, temp_input, cache_path, seek)
                 try:
-                    returncode, _, _ = future.result(timeout=15)
+                    rc, _, _ = future.result(timeout=15)
                 except FuturesTimeoutError:
                     future.cancel()
                     abort(504)
 
-                if returncode == 0 and cache_manager.cache_exists(cache_path):
+                if rc == 0 and cache_manager.cache_exists(cache_path):
                     cache_manager.track_file_access(session_id, cache_path)
                     return send_file(cache_path, mimetype="image/jpeg")
-                else:
-                    abort(500)
-
+                abort(500)
             finally:
                 try:
                     os.unlink(temp_input)
                 except Exception:
                     pass
-
         except Exception as e:
             print(f"Video thumbnail error: {e}")
             abort(500)
@@ -324,76 +259,54 @@ def create_video_routes(zip_manager):
     @login_required
     def video_thumbnail_gif(zip_id, path):
         """Generate an animated GIF preview for a video."""
-        zip_info = zip_manager.get_zip_info(zip_id)
-        if not zip_info or not FFMPEG_AVAILABLE:
+        if not FFMPEG_AVAILABLE:
             abort(404)
 
-        if not zip_info["zfile"]:
-            if not zip_manager.load_zip_file(zip_id):
-                abort(404)
-
-        session_id = request.cookies.get('session', 'default')
+        session_id = request.cookies.get("session", "default")
         cache_path = cache_manager.get_thumb_cache_path(zip_id, path, "gif")
-        
         if cache_manager.cache_exists(cache_path):
             cache_manager.track_file_access(session_id, cache_path)
             return send_file(cache_path, mimetype="image/gif")
 
-        # Quick timeout for GIF generation
         if not FFMPEG_LOCK.acquire(timeout=2):
             abort(503)
 
         try:
-            zfile = zip_manager.get_zip_file_object(zip_id)
-            if not zfile:
+            temp_input = _extract_to_tempfile(zip_manager, zip_id, path)
+            if not temp_input:
                 abort(404)
-
-            video_data = zfile.read(path)
-            if hasattr(zfile, "close"):
-                zfile.close()
-
-            ext = os.path.splitext(path)[1]
-            temp_input = cache_manager.get_temp_path(ext)
-            
             try:
-                with open(temp_input, 'wb') as f:
-                    f.write(video_data)
-
-                duration = _get_video_duration(temp_input)
-
-                future = FFMPEG_EXECUTOR.submit(
-                    _create_gif_preview_sync, temp_input, cache_path, duration
-                )
-                
+                future = FFMPEG_EXECUTOR.submit(create_gif_preview, temp_input, cache_path)
                 try:
-                    returncode, _, _ = future.result(timeout=30)
+                    rc, _, _ = future.result(timeout=30)
                 except FuturesTimeoutError:
                     future.cancel()
                     abort(504)
 
-                if returncode == 0 and cache_manager.cache_exists(cache_path):
+                if rc == 0 and cache_manager.cache_exists(cache_path):
                     cache_manager.track_file_access(session_id, cache_path)
                     return send_file(cache_path, mimetype="image/gif")
-                else:
-                    abort(500)
-
+                abort(500)
             finally:
                 try:
                     os.unlink(temp_input)
                 except Exception:
                     pass
-
         except Exception as e:
             print(f"Video GIF error: {e}")
             abort(500)
         finally:
             FFMPEG_LOCK.release()
 
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
     @bp.route("/release-video/<zip_id>/<path:path>", methods=["POST"])
     @login_required
     def release_video(zip_id, path):
         """Release video cache when user closes video player."""
-        session_id = request.cookies.get('session', 'default')
+        session_id = request.cookies.get("session", "default")
         cache_manager.release_video(session_id, zip_id, path)
         return jsonify({"success": True})
 

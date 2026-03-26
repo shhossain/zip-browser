@@ -9,7 +9,7 @@ import zipfile
 
 import pytest
 
-from src.archive_handler import (
+from src.archive_handlers import (
     ArchiveFile,
     open_archive,
     get_archive_ext,

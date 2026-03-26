@@ -984,6 +984,95 @@ body {
   backdrop-filter: blur(8px);
 }
 
+/* Video audio track selector */
+.video-audio-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.7rem;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.8rem;
+}
+
+.video-audio-bar select {
+  background: rgba(255, 255, 255, 0.12);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius);
+  padding: 0.2rem 0.4rem;
+  font-size: 0.8rem;
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.video-audio-bar select:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.video-audio-bar select option {
+  background: #1a1a2e;
+  color: white;
+}
+
+/* Video seek bar */
+.video-seek-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  max-width: 100%;
+  margin-top: 0.4rem;
+  padding: 0.3rem 0;
+}
+
+.seek-time {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.2em;
+  text-align: center;
+  user-select: none;
+}
+
+.seek-track {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  position: relative;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.seek-track:hover {
+  height: 8px;
+}
+
+.seek-buffered {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.seek-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  pointer-events: none;
+  transition: width 0.15s linear;
+}
+
 /* Video Thumbnail */
 .video-item {
   cursor: pointer;

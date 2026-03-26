@@ -87,7 +87,12 @@ class CacheManager:
         cache_key = self._get_stable_cache_key(zip_id, path)
         ext = "gif" if thumb_type == "gif" else "jpg"
         return os.path.join(self._thumb_cache_dir, f"{cache_key}_{thumb_type}.{ext}")
-    
+
+    def get_sub_cache_dir(self, zip_id: str, path: str) -> str:
+        """Get the cache directory for extracted subtitle VTT files."""
+        cache_key = self._get_stable_cache_key(zip_id, path)
+        return os.path.join(self._base_cache_dir, "subs", cache_key)
+
     def get_temp_path(self, suffix: str = "") -> str:
         """Get a temporary file path that will be auto-cleaned."""
         return os.path.join(self._temp_dir, f"{secrets.token_hex(16)}{suffix}")
