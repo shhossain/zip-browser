@@ -6,7 +6,7 @@ import pytest
 
 from src.archive_handlers import is_nested_archive, is_supported_archive
 from src.zip_manager import ZipManager
-from src.utils import get_zip_file_hash
+from src.utils import get_source_hash
 
 
 # ==============================================================
@@ -43,7 +43,7 @@ class TestTreeBuildingWithNestedArchives:
     def test_nested_zip_marked_in_tree(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         tree = zm.zip_files[zip_id]["tree"]
@@ -55,7 +55,7 @@ class TestTreeBuildingWithNestedArchives:
     def test_nested_tar_marked_in_tree(self, nested_tar_in_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_tar_in_zip])
-        zip_id = get_zip_file_hash(nested_tar_in_zip)
+        zip_id = get_source_hash(nested_tar_in_zip)
         zm.load_zip_file(zip_id)
 
         tree = zm.zip_files[zip_id]["tree"]
@@ -64,7 +64,7 @@ class TestTreeBuildingWithNestedArchives:
     def test_is_item_archive(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         assert zm.is_item_archive(zip_id, "archives/inner.zip")
@@ -80,7 +80,7 @@ class TestOpenNestedArchive:
     def test_open_nested_zip(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         nested_id, needs_password = zm.open_nested_archive(zip_id, "archives/inner.zip")
@@ -102,7 +102,7 @@ class TestOpenNestedArchive:
     def test_open_nested_tar(self, nested_tar_in_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_tar_in_zip])
-        zip_id = get_zip_file_hash(nested_tar_in_zip)
+        zip_id = get_source_hash(nested_tar_in_zip)
         zm.load_zip_file(zip_id)
 
         nested_id, needs_password = zm.open_nested_archive(zip_id, "inner.tar")
@@ -115,7 +115,7 @@ class TestOpenNestedArchive:
     def test_read_file_from_nested_archive(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         nested_id, _ = zm.open_nested_archive(zip_id, "archives/inner.zip")
@@ -128,7 +128,7 @@ class TestOpenNestedArchive:
     def test_nested_archive_id_is_deterministic(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         id1 = zm.get_nested_archive_id(zip_id, "archives/inner.zip")
@@ -138,7 +138,7 @@ class TestOpenNestedArchive:
     def test_reopen_returns_existing_nested(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         id1, _ = zm.open_nested_archive(zip_id, "archives/inner.zip")
@@ -148,7 +148,7 @@ class TestOpenNestedArchive:
     def test_open_nonexistent_inner_path(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         nested_id, needs_pw = zm.open_nested_archive(zip_id, "nope.zip")
@@ -167,7 +167,7 @@ class TestNestedPasswordArchive:
     def test_nested_password_detected(self, nested_password_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_password_zip])
-        zip_id = get_zip_file_hash(nested_password_zip)
+        zip_id = get_source_hash(nested_password_zip)
         zm.load_zip_file(zip_id)
 
         nested_id, needs_password = zm.open_nested_archive(zip_id, "secret_inner.zip")
@@ -182,7 +182,7 @@ class TestNestedPasswordArchive:
     def test_nested_password_unlock(self, nested_password_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_password_zip])
-        zip_id = get_zip_file_hash(nested_password_zip)
+        zip_id = get_source_hash(nested_password_zip)
         zm.load_zip_file(zip_id)
 
         # First open — should request password
@@ -205,7 +205,7 @@ class TestNestedPasswordArchive:
     def test_nested_wrong_password(self, nested_password_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_password_zip])
-        zip_id = get_zip_file_hash(nested_password_zip)
+        zip_id = get_source_hash(nested_password_zip)
         zm.load_zip_file(zip_id)
 
         nested_id, _ = zm.open_nested_archive(zip_id, "secret_inner.zip")
@@ -221,7 +221,7 @@ class TestNestedArchiveCleanup:
     def test_cleanup_removes_temp_files(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         nested_id, _ = zm.open_nested_archive(zip_id, "archives/inner.zip")
@@ -240,7 +240,7 @@ class TestGetDirTreeWithNestedArchives:
     def test_get_dir_tree_returns_archive_sentinel(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         # Navigating to the directory containing the archive
@@ -250,7 +250,7 @@ class TestGetDirTreeWithNestedArchives:
     def test_get_dir_tree_path_to_archive_returns_sentinel(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         result = zm.get_dir_tree(zip_id, "archives/inner.zip")
@@ -264,7 +264,7 @@ class TestSearchWithNestedArchives:
     def test_search_finds_nested_archive(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         results = zm.search_files(zip_id, "inner")
@@ -278,7 +278,7 @@ class TestSearchWithNestedArchives:
     def test_search_type_files_includes_archives(self, nested_zip):
         zm = ZipManager()
         zm.initialize_zip_files([nested_zip])
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         zm.load_zip_file(zip_id)
 
         results = zm.search_files(zip_id, "inner", search_type="files")
@@ -350,7 +350,7 @@ class TestNestedArchiveRoutes:
         return client
 
     def test_browse_shows_archive_item(self, nested_client, nested_zip):
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         # Load the outer archive first
         resp = nested_client.get(f"/browse/{zip_id}/")
         assert resp.status_code == 200
@@ -361,7 +361,7 @@ class TestNestedArchiveRoutes:
         assert b"inner.zip" in resp.data
 
     def test_browse_into_nested_archive_redirects(self, nested_client, nested_zip):
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         # Load outer
         nested_client.get(f"/browse/{zip_id}/")
         # Navigate to the nested archive — should redirect
@@ -369,7 +369,7 @@ class TestNestedArchiveRoutes:
         assert resp.status_code == 302  # redirect to nested archive browse
 
     def test_browse_nested_archive_contents(self, nested_client, nested_zip):
-        zip_id = get_zip_file_hash(nested_zip)
+        zip_id = get_source_hash(nested_zip)
         # Load outer
         nested_client.get(f"/browse/{zip_id}/")
         # Follow redirect into nested archive
@@ -433,7 +433,7 @@ class TestNestedArchiveRoutes:
         user_manager.create_user("testuser", "testpass123", is_admin=False)
         client.post("/login", data={"username": "testuser", "password": "testpass123"})
 
-        zip_id = get_zip_file_hash(nested_password_zip)
+        zip_id = get_source_hash(nested_password_zip)
         # Load outer
         client.get(f"/browse/{zip_id}/")
         # Browse to password-protected nested archive

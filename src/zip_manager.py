@@ -1,7 +1,8 @@
 """
 Archive file management functionality.
-Supports ZIP, RAR, 7Z, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, GZ, and remote ZIP URLs.
-Supports nested archives (archives inside archives) with optional password.
+Supports ZIP, RAR, 7Z, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, GZ, remote ZIP URLs,
+browsable web URLs, .torrent files, and magnet URLs.
+Supports nested archives with optional password.
 """
 import os
 import glob
@@ -11,10 +12,38 @@ import urllib.parse
 from .archive_handlers import (
     open_archive,
     is_url as _is_url,
+    is_archive_url as _is_archive_url,
+    is_magnet as _is_magnet,
     is_nested_archive,
     ARCHIVE_GLOB_PATTERNS,
 )
-from .utils import get_zip_file_hash, is_image, is_video, should_show_file
+from .utils import get_source_hash, is_image, is_video, should_show_file
+
+
+class _ReadOnlyProxy:
+    """Lightweight proxy that delegates read/namelist but ignores close.
+
+    Used to hand out the long-lived URL handler to callers that expect to
+    close the object after a single read (thumb / view_file routes).
+    """
+
+    def __init__(self, handler):
+        self._h = handler
+
+    def read(self, name):
+        return self._h.read(name)
+
+    def namelist(self):
+        return self._h.namelist()
+
+    def close(self):
+        pass  # intentionally no-op
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *a):
+        pass
 
 
 class ZipManager:
@@ -29,6 +58,10 @@ class ZipManager:
         """Check if a path is a URL"""
         return _is_url(path)
 
+    def is_magnet(self, path):
+        """Check if a path is a magnet URL"""
+        return _is_magnet(path)
+
     def read_urls_from_file(self, file_path):
         """Read URLs from a text file"""
         urls = []
@@ -36,11 +69,29 @@ class ZipManager:
             with open(file_path, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
-                    if line and not line.startswith("#") and self.is_url(line):
+                    if line and not line.startswith("#") and (self.is_url(line) or self.is_magnet(line)):
                         urls.append(line)
         except Exception:
             pass
         return urls
+
+    @staticmethod
+    def read_url_shortcut(file_path):
+        """Read a URL from a ``.url`` shortcut file (INI-style).
+
+        Returns the URL string, or ``None`` on failure.
+        """
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.upper().startswith("URL="):
+                        url = line[4:].strip()
+                        if url:
+                            return url
+        except Exception:
+            pass
+        return None
 
     def check_zip_requires_password(self, zip_path):
         """Check if an archive file requires a password"""
@@ -75,7 +126,14 @@ class ZipManager:
         Files that are themselves supported archives are stored with the
         sentinel value ``"__archive__"`` instead of ``None`` so that the
         UI can render them as browsable entries.
+
+        Handlers that maintain their own tree (e.g. URL handler) bypass
+        the generic builder.
         """
+        # Use the handler's own tree when available (e.g. UrlHandler)
+        if hasattr(zfile, 'tree') and zfile.tree is not None:
+            return zfile.tree
+
         zip_tree = {}
         for name in zfile.namelist():
             # Skip system files and metadata files
@@ -107,10 +165,24 @@ class ZipManager:
         # Check if it's a URL
         if self.is_url(zip_path):
             return [zip_path]
+
+        # Check if it's a magnet URL
+        if self.is_magnet(zip_path):
+            return [zip_path]
+
+        # Expand ~ for local paths
+        zip_path = os.path.expanduser(zip_path)
         
         # Check if exists
         if not os.path.exists(zip_path):
             print("File does not exists")
+            return []
+
+        # Check if it's a .url shortcut file
+        if os.path.isfile(zip_path) and zip_path.lower().endswith('.url'):
+            url = self.read_url_shortcut(zip_path)
+            if url:
+                return [url]
             return []
 
         # Check if it's a text file containing URLs
@@ -148,6 +220,21 @@ class ZipManager:
                     if real not in seen:
                         seen.add(real)
                         archive_files_list.append(match)
+
+            # Also discover .url shortcut files
+            for match in glob.glob(os.path.join(zip_path, "*.url")):
+                url = self.read_url_shortcut(match)
+                if url and url not in seen:
+                    seen.add(url)
+                    archive_files_list.append(url)
+            for match in glob.glob(
+                os.path.join(zip_path, "**", "*.url"), recursive=True
+            ):
+                url = self.read_url_shortcut(match)
+                if url and url not in seen:
+                    seen.add(url)
+                    archive_files_list.append(url)
+
             return archive_files_list
         else:
             return []
@@ -169,29 +256,59 @@ class ZipManager:
 
             zfile = open_archive(zip_info["path"], password=pwd)
 
-            # Test by reading the first file entry
-            file_entries = [f for f in zfile.namelist() if not f.endswith("/")]
-            if file_entries:
-                zfile.read(file_entries[0])
+            # Test by reading the first file entry — skip for handlers
+            # that manage their own tree (URL handlers already verified
+            # connectivity during __init__).
+            if not hasattr(zfile, 'tree'):
+                file_entries = [f for f in zfile.namelist() if not f.endswith("/")]
+                if file_entries:
+                    zfile.read(file_entries[0])
 
+            tree = self.build_zip_tree(zfile)
+            # Set both atomically so we never end up with zfile set
+            # but tree empty (which causes 404 on subsequent attempts).
             zip_info["zfile"] = zfile
-            zip_info["tree"] = self.build_zip_tree(zfile)
+            zip_info["tree"] = tree
             return zfile
         except Exception:
             return None
 
     def get_zip_file_object(self, zip_id):
-        """Get a fresh archive file object for reading files."""
+        """Get a fresh archive file object for reading files.
+
+        For handlers that maintain their own state (URL handlers), a
+        lightweight proxy is returned so that the caller's ``close()``
+        does not tear down the long-lived session.
+        """
         if zip_id not in self.zip_files:
             return None
 
         zip_info = self.zip_files[zip_id]
+
+        # Reuse URL handlers via a non-closable proxy
+        existing = zip_info.get("zfile")
+        if existing and hasattr(existing, 'tree'):
+            return _ReadOnlyProxy(existing)
 
         try:
             pwd = zip_info["password"].encode("utf-8") if zip_info.get("password") else None
             return open_archive(zip_info["path"], password=pwd)
         except Exception:
             return None
+
+    def get_file_url(self, zip_id, path):
+        """Return a direct URL for a file if the handler supports it.
+
+        For ``UrlHandler`` entries this returns the remote URL so callers
+        (e.g. ffmpeg, the view route) can stream from it directly without
+        downloading through ``read()``.  Returns ``None`` otherwise.
+        """
+        if zip_id not in self.zip_files:
+            return None
+        zfile = self.zip_files[zip_id].get("zfile")
+        if zfile and hasattr(zfile, 'get_url'):
+            return zfile.get_url(path)
+        return None
 
     # ------------------------------------------------------------------
     # Nested archive support
@@ -299,27 +416,43 @@ class ZipManager:
         for zip_path in zip_paths:
             available_zips = self.discover_zip_files(zip_path)
             for zip_file_path in available_zips:
-                zip_id = get_zip_file_hash(zip_file_path)
+                zip_id = get_source_hash(zip_file_path)
 
                 # Generate appropriate name for the ZIP file
-                if self.is_url(zip_file_path):
-                    # For URLs, extract filename from the URL path
+                if self.is_magnet(zip_file_path):
+                    # Extract display name from magnet link (dn= parameter)
+                    try:
+                        parsed = urllib.parse.urlparse(zip_file_path)
+                        params = urllib.parse.parse_qs(parsed.query)
+                        dn = params.get('dn', [None])[0]
+                        zip_name = urllib.parse.unquote(dn) if dn else f"magnet_{hash(zip_file_path) % 10000}"
+                    except Exception:
+                        zip_name = f"magnet_{hash(zip_file_path) % 10000}"
+                elif self.is_url(zip_file_path):
                     parsed_url = urllib.parse.urlparse(zip_file_path)
-                    zip_name = (
-                        os.path.basename(parsed_url.path)
-                        or f"remote_zip_{hash(zip_file_path) % 10000}.zip"
-                    )
+                    path_part = parsed_url.path.rstrip('/')
+                    zip_name = os.path.basename(path_part) if path_part else ''
+                    if not zip_name:
+                        zip_name = parsed_url.netloc or f"remote_{hash(zip_file_path) % 10000}"
+                    zip_name = urllib.parse.unquote(zip_name)
                 else:
                     # For local files, use the basename
                     zip_name = os.path.basename(zip_file_path)
 
+                # Skip expensive password check for non-archive web URLs,
+                # magnets, and .torrent files (read() needs libtorrent).
+                is_magnet = self.is_magnet(zip_file_path)
+                is_web_url = self.is_url(zip_file_path) and not _is_archive_url(zip_file_path)
+                is_torrent = zip_file_path.lower().endswith('.torrent')
+                requires_pw = False if (is_web_url or is_magnet or is_torrent) else self.check_zip_requires_password(
+                    zip_file_path
+                )
+
                 self.zip_files[zip_id] = {
                     "path": zip_file_path,
                     "name": zip_name,
-                    "is_remote": self.is_url(zip_file_path),
-                    "requires_password": self.check_zip_requires_password(
-                        zip_file_path
-                    ),
+                    "is_remote": self.is_url(zip_file_path) or is_magnet,
+                    "requires_password": requires_pw,
                     "password": None,
                     "zfile": None,
                     "tree": {},
@@ -331,8 +464,23 @@ class ZipManager:
         Returns ``None`` for invalid paths.  If the path resolves to the
         ``"__archive__"`` sentinel the caller should handle it as a
         nested archive rather than a directory.
+
+        For handlers that support lazy discovery (URL handlers), the
+        page at *path* is crawled before the tree is read.
         """
-        if zip_id not in self.zip_files or not self.zip_files[zip_id]["tree"]:
+        if zip_id not in self.zip_files:
+            return None
+
+        zip_info = self.zip_files[zip_id]
+
+        # Trigger lazy discovery for handlers that support it
+        zfile = zip_info.get("zfile")
+        if zfile and hasattr(zfile, 'discover'):
+            zfile.discover(path)
+            # Sync the tree reference (discover mutates the handler's tree in-place)
+            zip_info["tree"] = zfile.tree
+
+        if not zip_info["tree"]:
             return None
 
         parts = path.strip("/").split("/") if path.strip("/") else []

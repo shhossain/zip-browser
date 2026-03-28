@@ -6,11 +6,11 @@ import hashlib
 import urllib.parse
 
 
-def get_zip_file_hash(zip_path):
+def get_source_hash(source):
     """Generate a unique hash for a zip file based on its path and modification time"""
     # Check if it's a URL
     try:
-        result = urllib.parse.urlparse(zip_path)
+        result = urllib.parse.urlparse(source)
         is_url = all([result.scheme, result.netloc]) and result.scheme in [
             "http",
             "https",
@@ -18,13 +18,18 @@ def get_zip_file_hash(zip_path):
     except Exception:
         is_url = False
 
+    is_magnet = source.startswith("magnet:")
+
     if is_url:
         # For URLs, just use the URL itself as the hash input
-        hash_input = zip_path
+        hash_input = source
+    elif is_magnet:
+        # For magnet links, use the link itself as the hash input
+        hash_input = source
     else:
         # For local files, use path, size, and modification time
-        stat = os.stat(zip_path)
-        hash_input = f"{zip_path}_{stat.st_size}_{stat.st_mtime}"
+        stat = os.stat(source)
+        hash_input = f"{source}_{stat.st_size}_{stat.st_mtime}"
 
     return hashlib.md5(hash_input.encode()).hexdigest()[:12]
 

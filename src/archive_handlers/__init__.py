@@ -1,7 +1,7 @@
 """
 Unified archive handler package providing a common interface for multiple archive formats.
 Supports: ZIP, RAR, 7Z, TAR, TAR.GZ, TAR.BZ2, TAR.XZ, GZ, remote ZIP URLs,
-and native filesystem directories.
+native filesystem directories, and browsable web URLs.
 """
 
 import os
@@ -15,11 +15,14 @@ from .sevenz_handler import SevenZArchiveHandler
 from .rar_handler import RarArchiveHandler
 from .remote_zip_handler import RemoteZipHandler
 from .filesystem_handler import FilesystemHandler
+from .url_handler import UrlHandler
+from .torrent_handler import TorrentHandler, is_magnet
 
 # ---------------------------------------------------------------------------
 # Extension sets (kept here for backward compatibility)
 # ---------------------------------------------------------------------------
 ZIP_EXTENSIONS = {".zip", ".iso"}
+TORRENT_EXTENSIONS = {".torrent"}
 TAR_EXTENSIONS = {".tar"}
 TAR_GZ_EXTENSIONS = {".tar.gz", ".tgz"}
 TAR_BZ2_EXTENSIONS = {".tar.bz2", ".tbz2"}
@@ -37,6 +40,7 @@ ALL_ARCHIVE_EXTENSIONS = (
     | GZ_EXTENSIONS
     | SEVENZ_EXTENSIONS
     | RAR_EXTENSIONS
+    | TORRENT_EXTENSIONS
 )
 
 ARCHIVE_GLOB_PATTERNS = [
@@ -52,6 +56,7 @@ ARCHIVE_GLOB_PATTERNS = [
     "*.gz",
     "*.7z",
     "*.rar",
+    "*.torrent",
 ]
 
 
@@ -98,6 +103,21 @@ def is_nested_archive(filename):
     return ext in ALL_ARCHIVE_EXTENSIONS
 
 
+def is_archive_url(url):
+    """Check if a URL points to a known archive file (by extension).
+
+    ``.torrent`` URLs are excluded because they need the TorrentHandler
+    (downloaded first, then parsed), not the RemoteZipHandler.
+    """
+    if not is_url(url):
+        return False
+    path = urllib.parse.urlparse(url).path.lower()
+    ext = get_archive_ext(path)
+    if ext in TORRENT_EXTENSIONS:
+        return False
+    return ext in ALL_ARCHIVE_EXTENSIONS
+
+
 # ---------------------------------------------------------------------------
 # Handler registry — maps extension to handler class
 # ---------------------------------------------------------------------------
@@ -112,6 +132,28 @@ for _ext in SEVENZ_EXTENSIONS:
     _HANDLER_MAP[_ext] = SevenZArchiveHandler
 for _ext in RAR_EXTENSIONS:
     _HANDLER_MAP[_ext] = RarArchiveHandler
+for _ext in TORRENT_EXTENSIONS:
+    _HANDLER_MAP[_ext] = TorrentHandler
+
+
+# ---------------------------------------------------------------------------
+# Factory helpers
+# ---------------------------------------------------------------------------
+def _download_and_open_torrent(url, *, password=None):
+    """Download a remote .torrent file to a temp path and open it."""
+    import tempfile
+    import requests
+
+    resp = requests.get(url, timeout=30, allow_redirects=True)
+    resp.raise_for_status()
+
+    tmp_dir = tempfile.mkdtemp(prefix="zipbrowser_torrent_dl_")
+    filename = os.path.basename(urllib.parse.urlparse(url).path) or "remote.torrent"
+    tmp_path = os.path.join(tmp_dir, filename)
+    with open(tmp_path, "wb") as f:
+        f.write(resp.content)
+
+    return TorrentHandler(tmp_path, password=password)
 
 
 # ---------------------------------------------------------------------------
@@ -122,12 +164,23 @@ def open_archive(path, *, password=None):
 
     Supported sources:
         - Local archive files (ZIP, RAR, 7Z, TAR variants, GZ)
-        - Remote ZIP URLs (http/https)
+        - Remote archive URLs (http/https pointing to archive files)
+        - Remote web URLs (http/https pages browsed as virtual filesystems)
         - Local directories (native filesystem browsing)
     """
-    # Remote ZIP
+    # Magnet URL
+    if is_magnet(path):
+        return TorrentHandler(path, password=password)
+
+    # Remote URL
     if is_url(path):
-        return RemoteZipHandler(path, password=password)
+        # .torrent URLs: download to temp file, then open with TorrentHandler
+        url_path = urllib.parse.urlparse(path).path.lower()
+        if get_archive_ext(url_path) in TORRENT_EXTENSIONS:
+            return _download_and_open_torrent(path, password=password)
+        if is_archive_url(path):
+            return RemoteZipHandler(path, password=password)
+        return UrlHandler(path, password=password)
 
     # Native filesystem directory
     if os.path.isdir(path):
@@ -159,10 +212,12 @@ __all__ = [
     "RarArchiveHandler",
     "RemoteZipHandler",
     "FilesystemHandler",
+    "UrlHandler",
     "open_archive",
     "ArchiveFile",
     "get_archive_ext",
     "is_url",
+    "is_archive_url",
     "is_supported_archive",
     "is_directory",
     "is_nested_archive",

@@ -308,36 +308,86 @@
   </button>
 </div>
 
-<div id="video-player">
-  <button class="nav close" onclick="closeVideoPlayer()">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/>
-    </svg>
-  </button>
-  <div class="video-container">
+<div id="video-player" onclick="if(event.target===this)closeVideoPlayer()">
+  <div class="vp-wrapper">
     <div class="video-loading" id="video-loading">
       <div class="loading-spinner"></div>
       <span>Loading video...</span>
     </div>
-    <video id="video-element" controls autoplay crossorigin="anonymous">
+    <video id="video-element" autoplay crossorigin="anonymous" onclick="vpTogglePlay()">
       Your browser does not support the video tag.
     </video>
-    <!-- Audio track selector (only visible for multi-audio files) -->
-    <div class="video-audio-bar" id="video-audio-bar" style="display:none;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-      <select id="audio-track-select" onchange="switchAudioTrack()"></select>
-    </div>
-    <!-- Custom seek bar showing real duration -->
-    <div class="video-seek-bar" id="video-seek-bar" style="display:none;">
-      <span class="seek-time" id="seek-time-current">0:00</span>
-      <div class="seek-track" id="seek-track">
-        <div class="seek-buffered" id="seek-buffered"></div>
-        <div class="seek-progress" id="seek-progress"></div>
+    <!-- Custom subtitle overlay (synced with _seekOffset) -->
+    <div class="vp-subtitle-overlay" id="vp-subtitle-overlay"></div>
+    <!-- Controls overlay -->
+    <div class="vp-controls" id="vp-controls">
+      <!-- Progress bar row -->
+      <div class="vp-progress-row">
+        <div class="vp-progress-track" id="vp-progress-track">
+          <div class="vp-progress-buffered" id="vp-progress-buffered"></div>
+          <div class="vp-progress-filled" id="vp-progress-filled"></div>
+          <div class="vp-progress-thumb" id="vp-progress-thumb"></div>
+        </div>
       </div>
-      <span class="seek-time" id="seek-time-total">0:00</span>
+      <!-- Buttons row -->
+      <div class="vp-buttons-row">
+        <div class="vp-left">
+          <button class="vp-btn" id="vp-play-btn" onclick="vpTogglePlay()" title="Play/Pause">
+            <svg id="vp-icon-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+            <svg id="vp-icon-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+          <button class="vp-btn" onclick="vpSkip(-10)" title="Back 10s">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12.5 3C7.81 3 4.01 6.58 3.68 11H1l4 4.5 4-4.5H6.68C7 8.79 9.47 6.5 12.5 6.5c3.31 0 6 2.69 6 6s-2.69 6-6 6c-1.66 0-3.16-.67-4.24-1.76l-2.12 2.12C7.84 20.56 10.04 21.5 12.5 21.5c4.97 0 9-4.03 9-9s-4.03-9-9-9z"/><text x="10" y="16" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">10</text></svg>
+          </button>
+          <button class="vp-btn" onclick="vpSkip(10)" title="Forward 10s">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M11.5 3c4.69 0 8.49 3.58 8.82 8H23l-4 4.5-4-4.5h2.82C17.5 8.79 15.03 6.5 12 6.5c-3.31 0-6 2.69-6 6s2.69 6 6 6c1.66 0 3.16-.67 4.24-1.76l2.12 2.12C16.66 20.56 14.46 21.5 12 21.5c-4.97 0-9-4.03-9-9s4.03-9 9-9z"/><text x="14" y="16" font-size="8" text-anchor="middle" fill="currentColor" font-weight="bold">10</text></svg>
+          </button>
+          <div class="vp-volume-group">
+            <button class="vp-btn" id="vp-vol-btn" onclick="vpToggleMute()" title="Mute">
+              <svg id="vp-icon-vol" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+              <svg id="vp-icon-mute" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+            </button>
+            <input type="range" class="vp-volume-slider" id="vp-volume-slider" min="0" max="1" step="0.05" value="1" oninput="vpSetVolume(this.value)">
+          </div>
+          <span class="vp-time" id="vp-time">0:00 / 0:00</span>
+        </div>
+        <div class="vp-right">
+          <!-- Audio track selector (hidden when single track) -->
+          <div class="vp-menu-wrap" id="vp-audio-wrap" style="display:none">
+            <button class="vp-btn" onclick="vpToggleMenu('vp-audio-menu')" title="Audio Track">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v9.28c-.47-.17-.97-.28-1.5-.28C8.01 12 6 14.01 6 16.5S8.01 21 10.5 21c2.31 0 4.2-1.75 4.45-4H15V6h4V3h-7z"/></svg>
+            </button>
+            <div class="vp-menu" id="vp-audio-menu"></div>
+          </div>
+          <!-- Subtitle selector -->
+          <div class="vp-menu-wrap" id="vp-sub-wrap" style="display:none">
+            <button class="vp-btn" onclick="vpToggleMenu('vp-sub-menu')" title="Subtitles">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V6h16v12zM6 10h2v2H6v-2zm0 4h8v2H6v-2zm10 0h2v2h-2v-2zm-6-4h8v2h-8v-2z"/></svg>
+            </button>
+            <div class="vp-menu" id="vp-sub-menu"></div>
+          </div>
+          <!-- Quality selector -->
+          <div class="vp-menu-wrap" id="vp-quality-wrap">
+            <button class="vp-btn" onclick="vpToggleMenu('vp-quality-menu')" title="Quality">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"/></svg>
+            </button>
+            <div class="vp-menu" id="vp-quality-menu"></div>
+          </div>
+          <button class="vp-btn" onclick="vpToggleFullscreen()" title="Fullscreen">
+            <svg id="vp-icon-fs" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            <svg id="vp-icon-fs-exit" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Title bar overlay -->
+    <div class="vp-title-bar" id="vp-title-bar">
+      <button class="vp-btn vp-close-btn" onclick="closeVideoPlayer()" title="Close">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>
+      </button>
+      <span class="vp-title-text" id="video-title"></span>
     </div>
   </div>
-  <div class="video-title" id="video-title"></div>
 </div>
 
 {% endblock %}
@@ -424,86 +474,98 @@
 
       // Video Player Functions
       let _currentVideoInfo = null;
-      let _seekOffset = 0;  // seconds into the real timeline where the stream starts
+      let _seekOffset = 0;
       let _totalDuration = 0;
+      let _controlsTimer = null;
+      let _activeMenu = null;
+      let _vpCurrentQuality = "auto";
 
       function openVideoPlayer(filename) {
         const dirPath = "{{ path }}";
         const videoPath = (dirPath ? dirPath + "/" : "") + filename;
-        
-        const videoElement = document.getElementById("video-element");
-        const videoTitle = document.getElementById("video-title");
+        const videoEl = document.getElementById("video-element");
         const videoPlayer = document.getElementById("video-player");
         const videoLoading = document.getElementById("video-loading");
-        
+
         videoPlayer.style.display = "flex";
         document.body.style.overflow = "hidden";
-        videoTitle.textContent = filename;
+        document.getElementById("video-title").textContent = filename;
         if (videoLoading) videoLoading.style.display = "flex";
-        videoElement.style.opacity = "0";
+        videoEl.style.opacity = "0";
 
         _currentVideoInfo = null;
         _seekOffset = 0;
         _totalDuration = 0;
-        document.getElementById("video-audio-bar").style.display = "none";
-        document.getElementById("video-seek-bar").style.display = "none";
-        _clearTracks(videoElement);
-        
+        _vpCurrentQuality = "auto";
+        _clearTracks(videoEl);
+        _vpShowControls();
+
         fetch("{{ url_for('video.video_info', zip_id=zip_id, path='') }}" + videoPath)
           .then(res => res.json())
           .then(info => {
             _currentVideoInfo = info;
             _totalDuration = info.duration || 0;
             _seekOffset = 0;
-            _loadVideoSource(videoElement, info, 0, 0);
-            _setupAudioSelector(info.audio_tracks || []);
-            _addSubtitleTracks(videoElement, info.subtitle_tracks || []);
-            _initSeekBar();
+            _loadVideoSource(videoEl, info, 0, 0);
+            _vpSetupAudio(info.audio_tracks || []);
+            _vpSetupSubs(videoEl, info.subtitle_tracks || []);
+            _vpSetupQuality(info.needs_transcoding);
+            _vpInitProgress();
 
-            videoElement.onloadeddata = function() {
+            videoEl.onloadeddata = function() {
               if (videoLoading) videoLoading.style.display = "none";
-              videoElement.style.opacity = "1";
+              videoEl.style.opacity = "1";
             };
-            
-            videoElement.onerror = function() {
-              if (videoElement.src !== info.direct_url) {
-                videoElement.src = info.direct_url;
+
+            videoEl.onerror = function() {
+              if (videoEl.src !== info.direct_url) {
+                videoEl.src = info.direct_url;
               } else if (videoLoading) {
                 videoLoading.innerHTML = '<span style="color: #ef4444;">Failed to load video.</span>';
               }
             };
 
-            videoElement.play().catch(() => {});
+            videoEl.play().catch(() => {});
           })
           .catch(() => {
             const fullPath = "{{ url_for('browse.view_file', zip_id=zip_id, path='') }}" + videoPath;
-            videoElement.src = fullPath;
+            videoEl.src = fullPath;
             if (videoLoading) videoLoading.style.display = "none";
-            videoElement.style.opacity = "1";
-            videoElement.play().catch(() => {});
+            videoEl.style.opacity = "1";
+            _vpInitProgress();
+            videoEl.play().catch(() => {});
           });
       }
-      
+
       function closeVideoPlayer() {
-        const videoElement = document.getElementById("video-element");
-        videoElement.pause();
-        videoElement.removeEventListener("timeupdate", _onTimeUpdate);
-        _clearTracks(videoElement);
-        videoElement.src = "";
+        const videoEl = document.getElementById("video-element");
+        videoEl.pause();
+        videoEl.removeEventListener("timeupdate", _vpOnTimeUpdate);
+        videoEl.removeEventListener("progress", _vpUpdateBuffered);
+        videoEl.removeEventListener("play", _vpOnPlayState);
+        videoEl.removeEventListener("pause", _vpOnPlayState);
+        _clearTracks(videoEl);
+        videoEl.src = "";
         document.getElementById("video-player").style.display = "none";
         document.body.style.overflow = "";
         _currentVideoInfo = null;
         _seekOffset = 0;
         _totalDuration = 0;
+        _activeMenu = null;
+        if (_controlsTimer) clearTimeout(_controlsTimer);
+        if (_subRefreshTimer) { clearTimeout(_subRefreshTimer); _subRefreshTimer = null; }
+        if (_seekWaitTimer) { clearTimeout(_seekWaitTimer); _seekWaitTimer = null; }
+        _subPollingUrl = null;
       }
 
-      // --- Helpers ---
+      // --- Source helpers ---
 
       function _buildStreamUrl(info, audioIdx, seekTime) {
         let url = info.stream_url;
         const sep = url.includes("?") ? "&" : "?";
         url += sep + "audio=" + (audioIdx || 0);
         if (seekTime > 0) url += "&ss=" + seekTime;
+        if (_vpCurrentQuality !== "auto") url += "&quality=" + _vpCurrentQuality;
         return url;
       }
 
@@ -512,106 +574,621 @@
         videoEl.src = _buildStreamUrl(info, audioIdx, seekTime);
       }
 
-      // --- Seek bar ---
+      // --- Formatting ---
 
       function _fmtTime(s) {
         s = Math.max(0, Math.floor(s));
         const h = Math.floor(s / 3600);
         const m = Math.floor((s % 3600) / 60);
         const sec = s % 60;
-        if (h > 0) return h + ":" + String(m).padStart(2,"0") + ":" + String(sec).padStart(2,"0");
-        return m + ":" + String(sec).padStart(2,"0");
+        if (h > 0) return h + ":" + String(m).padStart(2, "0") + ":" + String(sec).padStart(2, "0");
+        return m + ":" + String(sec).padStart(2, "0");
       }
 
-      function _onTimeUpdate() {
-        if (!_totalDuration) return;
-        const realPos = _seekOffset + (document.getElementById("video-element").currentTime || 0);
-        const pct = Math.min(100, (realPos / _totalDuration) * 100);
-        document.getElementById("seek-progress").style.width = pct + "%";
-        document.getElementById("seek-time-current").textContent = _fmtTime(realPos);
+      // --- Play/Pause ---
+
+      function vpTogglePlay() {
+        const v = document.getElementById("video-element");
+        if (v.paused) v.play().catch(() => {}); else v.pause();
       }
 
-      function _initSeekBar() {
-        const bar = document.getElementById("video-seek-bar");
-        if (!_totalDuration || !_currentVideoInfo?.needs_transcoding) {
-          bar.style.display = "none";
+      function _vpOnPlayState() {
+        const v = document.getElementById("video-element");
+        document.getElementById("vp-icon-play").style.display = v.paused ? "" : "none";
+        document.getElementById("vp-icon-pause").style.display = v.paused ? "none" : "";
+      }
+
+      // --- Skip ---
+
+      function vpSkip(delta) {
+        const v = document.getElementById("video-element");
+        const info = _currentVideoInfo;
+        if (!info) return;
+
+        if (info.needs_transcoding && _totalDuration) {
+          const realPos = _seekOffset + (v.currentTime || 0);
+          const target = Math.max(0, Math.min(_totalDuration, realPos + delta));
+          _vpSmartSeek(v, info, target);
+        } else {
+          v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + delta));
+        }
+      }
+
+      function _vpIsBuffered(v, time) {
+        for (let i = 0; i < v.buffered.length; i++) {
+          if (time >= v.buffered.start(i) && time <= v.buffered.end(i)) return true;
+        }
+        return false;
+      }
+
+      function _vpGetBufferEnd(v) {
+        let end = 0;
+        for (let i = 0; i < v.buffered.length; i++) {
+          if (v.buffered.end(i) > end) end = v.buffered.end(i);
+        }
+        return end;
+      }
+
+      /**
+       * Seek within the current stream when possible, otherwise reload
+       * from a new position.  For piped frag-MP4 streams the browser
+       * can only seek within already-buffered data; seeking beyond the
+       * buffer edge causes a snap-back.
+       *
+       * If the target is just past the buffer end (<= 20 s ahead), we
+       * wait for the buffer to catch up instead of reloading — this
+       * avoids a full server round-trip for small forward skips.
+       */
+      let _seekWaitTimer = null;
+      function _vpSmartSeek(v, info, target) {
+        if (_seekWaitTimer) { clearTimeout(_seekWaitTimer); _seekWaitTimer = null; }
+        const localTarget = target - _seekOffset;
+
+        if (localTarget >= 0 && _vpIsBuffered(v, localTarget)) {
+          v.currentTime = localTarget;
           return;
         }
-        bar.style.display = "flex";
-        document.getElementById("seek-time-total").textContent = _fmtTime(_totalDuration);
-        document.getElementById("seek-time-current").textContent = _fmtTime(0);
-        document.getElementById("seek-progress").style.width = "0%";
-        document.getElementById("seek-buffered").style.width = "0%";
 
-        const videoEl = document.getElementById("video-element");
-        videoEl.removeEventListener("timeupdate", _onTimeUpdate);
-        videoEl.addEventListener("timeupdate", _onTimeUpdate);
+        // If target is slightly ahead of the buffer (within 20 s), wait
+        // for data to arrive instead of reloading from server.
+        const bufEnd = _vpGetBufferEnd(v);
+        if (localTarget > 0 && localTarget <= bufEnd + 20) {
+          const loading = document.getElementById("video-loading");
+          if (loading) { loading.style.display = "flex"; loading.innerHTML = '<div class="loading-spinner"></div><span>Buffering...</span>'; }
+          v.style.opacity = "0.3";
+          let waited = 0;
+          const poll = () => {
+            if (_vpIsBuffered(v, localTarget)) {
+              if (loading) loading.style.display = "none";
+              v.style.opacity = "1";
+              v.currentTime = localTarget;
+              _seekWaitTimer = null;
+              return;
+            }
+            waited += 300;
+            if (waited > 8000) {
+              // Buffer didn't catch up in time — fall back to server reload.
+              if (loading) loading.style.display = "none";
+              v.style.opacity = "1";
+              _seekWaitTimer = null;
+              _vpSeekTo(target);
+              return;
+            }
+            _seekWaitTimer = setTimeout(poll, 300);
+          };
+          _seekWaitTimer = setTimeout(poll, 300);
+          return;
+        }
 
-        const track = document.getElementById("seek-track");
-        track.onclick = function(e) {
-          const rect = track.getBoundingClientRect();
-          const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-          const targetTime = pct * _totalDuration;
-          _seekTo(targetTime);
-        };
+        // Outside buffered range → reload from new server position
+        _vpSeekTo(target);
       }
 
-      function _seekTo(time) {
+      // --- Volume ---
+
+      function vpSetVolume(val) {
+        const v = document.getElementById("video-element");
+        v.volume = parseFloat(val);
+        v.muted = false;
+        _vpUpdateVolIcon();
+      }
+
+      function vpToggleMute() {
+        const v = document.getElementById("video-element");
+        v.muted = !v.muted;
+        _vpUpdateVolIcon();
+      }
+
+      function _vpUpdateVolIcon() {
+        const v = document.getElementById("video-element");
+        const muted = v.muted || v.volume === 0;
+        document.getElementById("vp-icon-vol").style.display = muted ? "none" : "";
+        document.getElementById("vp-icon-mute").style.display = muted ? "" : "none";
+        document.getElementById("vp-volume-slider").value = muted ? 0 : v.volume;
+      }
+
+      // --- Fullscreen ---
+
+      function vpToggleFullscreen() {
+        const wrap = document.querySelector(".vp-wrapper");
+        if (document.fullscreenElement) {
+          document.exitFullscreen();
+        } else {
+          (wrap.requestFullscreen || wrap.webkitRequestFullscreen).call(wrap);
+        }
+      }
+
+      document.addEventListener("fullscreenchange", function() {
+        const fs = !!document.fullscreenElement;
+        document.getElementById("vp-icon-fs").style.display = fs ? "none" : "";
+        document.getElementById("vp-icon-fs-exit").style.display = fs ? "" : "none";
+      });
+
+      // --- Progress / seek ---
+
+      function _vpOnTimeUpdate() {
+        const v = document.getElementById("video-element");
+        let pos, dur;
+
+        if (_currentVideoInfo?.needs_transcoding && _totalDuration) {
+          pos = _seekOffset + (v.currentTime || 0);
+          dur = _totalDuration;
+        } else {
+          pos = v.currentTime || 0;
+          dur = v.duration || 0;
+        }
+
+        if (dur > 0) {
+          const pct = Math.min(100, (pos / dur) * 100);
+          document.getElementById("vp-progress-filled").style.width = pct + "%";
+          document.getElementById("vp-progress-thumb").style.left = pct + "%";
+        }
+        document.getElementById("vp-time").textContent = _fmtTime(pos) + " / " + _fmtTime(dur);
+        _vpUpdateBuffered();
+        _vpUpdateSubtitle();
+      }
+
+      function _vpUpdateBuffered() {
+        const v = document.getElementById("video-element");
+        const bar = document.getElementById("vp-progress-buffered");
+        if (!v || !bar) return;
+        let dur;
+        if (_currentVideoInfo?.needs_transcoding && _totalDuration) {
+          dur = _totalDuration;
+        } else {
+          dur = v.duration || 0;
+        }
+        if (dur <= 0) { bar.style.width = "0%"; return; }
+        // Find the furthest buffered end
+        let bufEnd = 0;
+        for (let i = 0; i < v.buffered.length; i++) {
+          const end = v.buffered.end(i);
+          if (end > bufEnd) bufEnd = end;
+        }
+        // For transcoded streams, offset the buffer position
+        const realBufEnd = _seekOffset + bufEnd;
+        const pct = Math.min(100, (realBufEnd / dur) * 100);
+        bar.style.width = pct + "%";
+      }
+
+      function _vpInitProgress() {
+        const v = document.getElementById("video-element");
+        v.removeEventListener("timeupdate", _vpOnTimeUpdate);
+        v.addEventListener("timeupdate", _vpOnTimeUpdate);
+        v.removeEventListener("progress", _vpUpdateBuffered);
+        v.addEventListener("progress", _vpUpdateBuffered);
+        v.removeEventListener("play", _vpOnPlayState);
+        v.addEventListener("play", _vpOnPlayState);
+        v.removeEventListener("pause", _vpOnPlayState);
+        v.addEventListener("pause", _vpOnPlayState);
+
+        document.getElementById("vp-progress-filled").style.width = "0%";
+        document.getElementById("vp-progress-thumb").style.left = "0%";
+        document.getElementById("vp-time").textContent = "0:00 / " + _fmtTime(_totalDuration || 0);
+
+        const track = document.getElementById("vp-progress-track");
+        track.onmousedown = function(e) { _vpProgressInteract(e, true); };
+        track.ontouchstart = function(e) { _vpProgressInteract(e.touches[0], true); };
+      }
+
+      function _vpProgressInteract(e, startDrag) {
+        const track = document.getElementById("vp-progress-track");
+        const rect = track.getBoundingClientRect();
+        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+
+        const info = _currentVideoInfo;
+        if (info?.needs_transcoding && _totalDuration) {
+          const target = pct * _totalDuration;
+          const v = document.getElementById("video-element");
+          _vpSmartSeek(v, info, target);
+        } else {
+          const v = document.getElementById("video-element");
+          if (v.duration) v.currentTime = pct * v.duration;
+        }
+      }
+
+      function _vpSeekTo(time) {
         const info = _currentVideoInfo;
         if (!info) return;
-        const videoEl = document.getElementById("video-element");
-        const audioIdx = document.getElementById("audio-track-select").value || 0;
+        const v = document.getElementById("video-element");
+        const audioIdx = _vpCurrentAudioIdx();
         const loading = document.getElementById("video-loading");
         if (loading) { loading.style.display = "flex"; loading.innerHTML = '<div class="loading-spinner"></div><span>Seeking...</span>'; }
-        videoEl.style.opacity = "0.3";
-        _loadVideoSource(videoEl, info, audioIdx, time);
-        videoEl.onloadeddata = function() {
+        v.style.opacity = "0.3";
+        _loadVideoSource(v, info, audioIdx, time);
+        v.onloadeddata = function() {
           if (loading) loading.style.display = "none";
-          videoEl.style.opacity = "1";
+          v.style.opacity = "1";
         };
-        videoEl.play().catch(() => {});
+        v.play().catch(() => {});
       }
 
-      function _setupAudioSelector(tracks) {
-        const bar = document.getElementById("video-audio-bar");
-        const select = document.getElementById("audio-track-select");
-        select.innerHTML = "";
-        if (tracks.length <= 1) { bar.style.display = "none"; return; }
-        tracks.forEach(t => {
-          const opt = document.createElement("option");
-          opt.value = t.index;
-          opt.textContent = t.label;
-          select.appendChild(opt);
+      // --- Controls visibility (auto-hide) ---
+
+      function _vpShowControls() {
+        const el = document.querySelector(".vp-wrapper");
+        if (el) el.classList.add("vp-show-controls");
+        if (_controlsTimer) clearTimeout(_controlsTimer);
+        _controlsTimer = setTimeout(() => {
+          const v = document.getElementById("video-element");
+          if (v && !v.paused) {
+            el && el.classList.remove("vp-show-controls");
+          }
+        }, 3000);
+      }
+
+      document.addEventListener("mousemove", function(e) {
+        if (document.getElementById("video-player").style.display === "flex") {
+          _vpShowControls();
+        }
+      });
+
+      // --- Audio track menu ---
+
+      function _vpCurrentAudioIdx() {
+        const menu = document.getElementById("vp-audio-menu");
+        const active = menu.querySelector(".vp-menu-item.active");
+        return active ? active.dataset.idx : 0;
+      }
+
+      function _vpSetupAudio(tracks) {
+        const wrap = document.getElementById("vp-audio-wrap");
+        const menu = document.getElementById("vp-audio-menu");
+        menu.innerHTML = "";
+        if (tracks.length <= 1) { wrap.style.display = "none"; return; }
+        tracks.forEach((t, i) => {
+          const item = document.createElement("div");
+          item.className = "vp-menu-item" + (i === 0 ? " active" : "");
+          item.dataset.idx = t.index;
+          item.textContent = t.label;
+          item.onclick = function() {
+            menu.querySelectorAll(".vp-menu-item").forEach(el => el.classList.remove("active"));
+            item.classList.add("active");
+            _vpSwitchAudio(t.index);
+            _vpCloseMenus();
+          };
+          menu.appendChild(item);
         });
-        bar.style.display = "flex";
+        wrap.style.display = "";
       }
 
-      function switchAudioTrack() {
+      function _vpSwitchAudio(audioIdx) {
         const info = _currentVideoInfo;
         if (!info) return;
-        const videoEl = document.getElementById("video-element");
-        const audioIdx = document.getElementById("audio-track-select").value;
-        const realPos = _seekOffset + (videoEl.currentTime || 0);
-        _loadVideoSource(videoEl, info, audioIdx, realPos);
-        videoEl.play().catch(() => {});
+        const v = document.getElementById("video-element");
+        const realPos = _seekOffset + (v.currentTime || 0);
+        _loadVideoSource(v, info, audioIdx, realPos);
+        v.play().catch(() => {});
       }
 
-      function _addSubtitleTracks(videoEl, tracks) {
-        // Add <track> elements — browser shows native CC button
-        tracks.forEach(t => {
-          if (!t.vtt_url) return;
-          const track = document.createElement("track");
-          track.kind = "subtitles";
-          track.label = t.label;
-          track.srclang = t.lang || "und";
-          track.src = t.vtt_url;
-          videoEl.appendChild(track);
+      // --- Quality menu ---
+
+      function _vpSetupQuality(needsTranscoding) {
+        const menu = document.getElementById("vp-quality-menu");
+        const wrap = document.getElementById("vp-quality-wrap");
+        menu.innerHTML = "";
+        if (!needsTranscoding) { wrap.style.display = "none"; return; }
+
+        const presets = [
+          { key: "auto",   label: "Auto (Original)" },
+          { key: "high",   label: "High (1080p)" },
+          { key: "medium", label: "Medium (720p)" },
+          { key: "low",    label: "Low (480p)" },
+        ];
+        presets.forEach(p => {
+          const item = document.createElement("div");
+          item.className = "vp-menu-item" + (p.key === _vpCurrentQuality ? " active" : "");
+          item.textContent = p.label;
+          item.onclick = function() {
+            if (_vpCurrentQuality === p.key) { _vpCloseMenus(); return; }
+            menu.querySelectorAll(".vp-menu-item").forEach(el => el.classList.remove("active"));
+            item.classList.add("active");
+            _vpCurrentQuality = p.key;
+            _vpSwitchQuality();
+            _vpCloseMenus();
+          };
+          menu.appendChild(item);
         });
+        wrap.style.display = "";
+      }
+
+      function _vpSwitchQuality() {
+        const info = _currentVideoInfo;
+        if (!info) return;
+        const v = document.getElementById("video-element");
+        const audioIdx = _vpCurrentAudioIdx();
+        const realPos = _seekOffset + (v.currentTime || 0);
+        _loadVideoSource(v, info, audioIdx, realPos);
+        v.play().catch(() => {});
+      }
+
+      // --- Subtitle menu ---
+
+      // --- Subtitle system (offset-aware) ---
+      let _subCues = [];    // parsed cues for active track: [{start, end, text}]
+      let _activeSubIdx = -1; // -1 = off
+
+      function _vpSetupSubs(videoEl, tracks) {
+        const wrap = document.getElementById("vp-sub-wrap");
+        const menu = document.getElementById("vp-sub-menu");
+        menu.innerHTML = "";
+        _clearTracks(videoEl);
+        _subCues = [];
+        _activeSubIdx = -1;
+        document.getElementById("vp-subtitle-overlay").textContent = "";
+        if (!tracks || tracks.length === 0) { wrap.style.display = "none"; return; }
+
+        // "Off" option
+        const off = document.createElement("div");
+        off.className = "vp-menu-item active";
+        off.textContent = "Off";
+        off.onclick = function() {
+          menu.querySelectorAll(".vp-menu-item").forEach(el => el.classList.remove("active"));
+          off.classList.add("active");
+          _activeSubIdx = -1;
+          _subCues = [];
+          _subPollingUrl = null;
+          if (_subRefreshTimer) { clearTimeout(_subRefreshTimer); _subRefreshTimer = null; }
+          document.getElementById("vp-subtitle-overlay").textContent = "";
+          _vpCloseMenus();
+        };
+        menu.appendChild(off);
+
+        tracks.forEach((t, i) => {
+          if (!t.vtt_url && !t.subs_at_url) return;
+          const item = document.createElement("div");
+          item.className = "vp-menu-item";
+          item.textContent = t.label;
+          item.onclick = function() {
+            menu.querySelectorAll(".vp-menu-item").forEach(el => el.classList.remove("active"));
+            item.classList.add("active");
+            if (t.subs_at_url) {
+              _vpLoadSubStream(t.subs_at_url, i);
+            } else {
+              _vpLoadSubTrack(t.vtt_url, i);
+            }
+            _vpCloseMenus();
+          };
+          menu.appendChild(item);
+        });
+        wrap.style.display = "";
+      }
+
+      let _subRefreshTimer = null;
+      let _subPollingUrl = null;   // non-null → streaming subs mode
+
+      function _vpLoadSubTrack(url, idx) {
+        _activeSubIdx = idx;
+        _subCues = [];
+        _subPollingUrl = null;
+        if (_subRefreshTimer) { clearTimeout(_subRefreshTimer); _subRefreshTimer = null; }
+        document.getElementById("vp-subtitle-overlay").textContent = "Loading subtitles\u2026";
+        _vpFetchSubWithRetry(url, idx, 20);
+      }
+
+      function _vpLoadSubStream(subsAtUrl, idx) {
+        _activeSubIdx = idx;
+        _subCues = [];
+        _subPollingUrl = subsAtUrl;
+        if (_subRefreshTimer) { clearTimeout(_subRefreshTimer); _subRefreshTimer = null; }
+        document.getElementById("vp-subtitle-overlay").textContent = "Loading subtitles\u2026";
+        _vpPollSubsAt();
+      }
+
+      function _vpPollSubsAt() {
+        if (_activeSubIdx < 0 || !_subPollingUrl) return;
+        const v = document.getElementById("video-element");
+        const realTime = _seekOffset + (v.currentTime || 0);
+        const url = _subPollingUrl + (_subPollingUrl.includes("?") ? "&" : "?")
+          + "t=" + realTime + "&window=30";
+        fetch(url, {cache: "no-store"})
+          .then(r => r.ok ? r.json() : null)
+          .then(data => {
+            if (!data || _activeSubIdx < 0 || !_subPollingUrl) return;
+            if (data.cues && data.cues.length > 0) {
+              document.getElementById("vp-subtitle-overlay").textContent = "";
+              _vpMergeCues(data.cues);
+            } else if (!data.done && data.max_time < realTime) {
+              // Worker hasn't parsed up to the current time yet
+              document.getElementById("vp-subtitle-overlay").textContent = "";
+            } else {
+              document.getElementById("vp-subtitle-overlay").textContent = "";
+            }
+            console.log("[subs] polled:", data.cues?.length || 0, "cues near t=" + realTime.toFixed(1),
+              "total=" + data.total, "parsed_to=" + (data.max_time||0).toFixed(0) + "s",
+              data.done ? "(done)" : "(extracting)");
+            // Poll faster while extraction is still running
+            const interval = data.done ? 5000 : 2000;
+            _subRefreshTimer = setTimeout(_vpPollSubsAt, interval);
+          })
+          .catch(() => {
+            if (_subPollingUrl) {
+              _subRefreshTimer = setTimeout(_vpPollSubsAt, 3000);
+            }
+          });
+      }
+
+      function _vpMergeCues(newCues) {
+        // Merge into _subCues maintaining sorted order by start time.
+        const existing = new Set(_subCues.map(c => c.start.toFixed(2) + ":" + c.end.toFixed(2)));
+        let added = 0;
+        for (const cue of newCues) {
+          const key = cue.start.toFixed(2) + ":" + cue.end.toFixed(2);
+          if (existing.has(key)) continue;
+          existing.add(key);
+          // Binary insert to keep sorted
+          let lo = 0, hi = _subCues.length;
+          while (lo < hi) {
+            const mid = (lo + hi) >> 1;
+            if (_subCues[mid].start < cue.start) lo = mid + 1; else hi = mid;
+          }
+          _subCues.splice(lo, 0, cue);
+          added++;
+        }
+        if (added) console.log("[subs] merged", added, "new cues, total:", _subCues.length);
+      }
+
+      function _vpFetchSubWithRetry(url, idx, retriesLeft) {
+        if (_activeSubIdx !== idx) return;
+        fetch(url, {cache: "no-store"})
+          .then(r => {
+            if (!r.ok) throw new Error("HTTP " + r.status);
+            const extracting = r.headers.get("X-Sub-Extracting") === "1";
+            return r.text().then(t => ({t, extracting}));
+          })
+          .then(({t, extracting}) => {
+            if (_activeSubIdx !== idx) return;
+            const cues = _parseVTT(t);
+            document.getElementById("vp-subtitle-overlay").textContent = "";
+            console.log("[subs] Loaded", cues.length, "cues", extracting ? "(extracting)" : "");
+            if (cues.length === 0 && (retriesLeft > 0 || extracting)) {
+              // No cues yet — extraction still running; retry quickly
+              const next = extracting ? Math.max(retriesLeft, 6) : retriesLeft - 1;
+              setTimeout(() => _vpFetchSubWithRetry(url, idx, next), 3000);
+              return;
+            }
+            _subCues = cues;
+            _vpScheduleSubRefresh(url, idx, cues.length, 0);
+          })
+          .catch(err => {
+            if (_activeSubIdx !== idx) return;
+            if (retriesLeft > 0) {
+              setTimeout(() => _vpFetchSubWithRetry(url, idx, retriesLeft - 1), 3000);
+            } else {
+              document.getElementById("vp-subtitle-overlay").textContent = "";
+              console.warn("[subs] Failed to load:", url, err);
+              _subCues = [];
+            }
+          });
+      }
+
+      function _vpScheduleSubRefresh(url, idx, prevCount, stableRounds) {
+        // Stop if user switched track or count stabilised while not extracting
+        if (_activeSubIdx !== idx || stableRounds >= 3) return;
+        _subRefreshTimer = setTimeout(() => {
+          if (_activeSubIdx !== idx) return;
+          fetch(url, {cache: "no-store"})
+            .then(r => {
+              const ext = r.headers.get("X-Sub-Extracting") === "1";
+              return r.ok ? r.text().then(t => ({t, ext})) : null;
+            })
+            .then(result => {
+              if (!result || _activeSubIdx !== idx) return;
+              const cues = _parseVTT(result.t);
+              if (cues.length > _subCues.length) {
+                _subCues = cues;
+                console.log("[subs] Refreshed:", cues.length, "cues");
+              }
+              // While extraction is in progress, never count as stable
+              const stable = (cues.length === prevCount && !result.ext)
+                ? stableRounds + 1 : 0;
+              _vpScheduleSubRefresh(url, idx, cues.length, stable);
+            })
+            .catch(() => {
+              _vpScheduleSubRefresh(url, idx, prevCount, stableRounds);
+            });
+        }, 8000);  // re-check every 8 s
+      }
+
+      function _parseVTT(text) {
+        const cues = [];
+        // Normalize line endings and split on blank lines
+        const blocks = text.replace(/\r\n?/g, "\n").split(/\n\n+/);
+        for (const block of blocks) {
+          // Match timestamps: supports HH:MM:SS.mmm and MM:SS.mmm
+          const m = block.match(/(\d{1,2}:(?:\d{2}:)?\d{2}[.,]\d{2,3})\s*-->\s*(\d{1,2}:(?:\d{2}:)?\d{2}[.,]\d{2,3})/);
+          if (!m) continue;
+          const start = _parseVTTTime(m[1]);
+          const end = _parseVTTTime(m[2]);
+          const lines = block.split("\n");
+          const tsLineIdx = lines.findIndex(l => l.includes("-->"));
+          const txt = lines.slice(tsLineIdx + 1).join("\n").trim();
+          if (txt) cues.push({ start, end, text: txt });
+        }
+        return cues;
+      }
+
+      function _parseVTTTime(ts) {
+        const parts = ts.replace(",", ".").split(":");
+        if (parts.length === 3) return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+        return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+      }
+
+      function _vpUpdateSubtitle() {
+        const overlay = document.getElementById("vp-subtitle-overlay");
+        if (_activeSubIdx < 0 || _subCues.length === 0) {
+          overlay.textContent = "";
+          return;
+        }
+        const v = document.getElementById("video-element");
+        const realTime = _seekOffset + (v.currentTime || 0);
+        let found = "";
+        for (const cue of _subCues) {
+          if (realTime >= cue.start && realTime <= cue.end) {
+            found = cue.text;
+            break;
+          }
+        }
+        if (overlay.innerHTML !== found) overlay.innerHTML = found;
       }
 
       function _clearTracks(videoEl) {
         videoEl.querySelectorAll("track").forEach(t => t.remove());
       }
+
+      // --- Menus ---
+
+      function vpToggleMenu(menuId) {
+        const menu = document.getElementById(menuId);
+        if (_activeMenu && _activeMenu !== menu) _activeMenu.classList.remove("show");
+        menu.classList.toggle("show");
+        _activeMenu = menu.classList.contains("show") ? menu : null;
+      }
+
+      function _vpCloseMenus() {
+        document.querySelectorAll(".vp-menu.show").forEach(m => m.classList.remove("show"));
+        _activeMenu = null;
+      }
+
+      // Close menus on outside click
+      document.addEventListener("click", function(e) {
+        if (_activeMenu && !e.target.closest(".vp-menu-wrap")) _vpCloseMenus();
+      });
+
+      // Keyboard shortcuts
+      document.addEventListener("keydown", function(e) {
+        if (document.getElementById("video-player").style.display !== "flex") return;
+        switch(e.key) {
+          case " ": case "k": e.preventDefault(); vpTogglePlay(); break;
+          case "ArrowLeft": e.preventDefault(); vpSkip(-10); break;
+          case "ArrowRight": e.preventDefault(); vpSkip(10); break;
+          case "ArrowUp": e.preventDefault(); vpSetVolume(Math.min(1, (document.getElementById("video-element").volume || 0) + 0.1)); break;
+          case "ArrowDown": e.preventDefault(); vpSetVolume(Math.max(0, (document.getElementById("video-element").volume || 0) - 0.1)); break;
+          case "m": vpToggleMute(); break;
+          case "f": vpToggleFullscreen(); break;
+          case "Escape": closeVideoPlayer(); break;
+        }
+      });
 
       // Video thumbnail GIF preview on hover/touch
       const gifCache = new Map();

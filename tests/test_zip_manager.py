@@ -7,7 +7,7 @@ import zipfile
 import pytest
 
 from src.zip_manager import ZipManager
-from src.utils import get_zip_file_hash
+from src.utils import get_source_hash
 
 
 class TestZipManagerUrlDetection:
@@ -62,7 +62,7 @@ class TestZipManagerTree:
     def test_build_tree(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         tree = zm.zip_files[zip_id]["tree"]
@@ -77,7 +77,7 @@ class TestZipManagerTree:
     def test_get_dir_tree_root(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         root = zm.get_dir_tree(zip_id, "")
@@ -87,7 +87,7 @@ class TestZipManagerTree:
     def test_get_dir_tree_subfolder(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         sub = zm.get_dir_tree(zip_id, "images")
@@ -97,7 +97,7 @@ class TestZipManagerTree:
     def test_get_dir_tree_invalid_path(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         assert zm.get_dir_tree(zip_id, "nonexistent") is None
@@ -125,7 +125,7 @@ class TestZipManagerSearch:
     def test_search_all(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         results = zm.search_files(zip_id, "photo")
@@ -135,7 +135,7 @@ class TestZipManagerSearch:
     def test_search_images_only(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         results = zm.search_files(zip_id, "photo", "images")
@@ -144,7 +144,7 @@ class TestZipManagerSearch:
     def test_search_no_match(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         results = zm.search_files(zip_id, "xyznonexistent")
@@ -153,7 +153,7 @@ class TestZipManagerSearch:
     def test_search_empty_query(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         results = zm.search_files(zip_id, "")
@@ -164,7 +164,7 @@ class TestZipManagerMisc:
     def test_get_zip_info(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         info = zm.get_zip_info(zip_id)
         assert info is not None
         assert info["name"] == "sample.zip"
@@ -179,7 +179,7 @@ class TestZipManagerMisc:
     def test_get_first_image_in_folder(self, sample_zip):
         zm = ZipManager()
         zm.initialize_zip_files([sample_zip])
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         zm.load_zip_file(zip_id)
 
         first = zm.get_first_image_in_folder(zip_id, "images")

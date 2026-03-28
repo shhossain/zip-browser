@@ -13,6 +13,9 @@ from flask import (
     render_template,
     send_file,
     abort,
+    redirect,
+    url_for,
+    flash,
 )
 from flask_login import login_required
 from PIL import Image
@@ -47,6 +50,75 @@ def create_browse_routes(zip_manager, user_manager=None):
             "zip_list.html", zip_files=zip_manager.get_all_zip_files()
         )
 
+    @bp.route("/add_source", methods=["POST"])
+    @login_required
+    def add_source():
+        """Add a new archive source (URL, magnet, local path, or .torrent upload)."""
+        source = request.form.get("source", "").strip()
+        uploaded = request.files.get("torrent_file")
+
+        if uploaded and uploaded.filename:
+            # Handle uploaded .torrent file
+            import tempfile
+            fname = os.path.basename(uploaded.filename)
+            if not fname.lower().endswith(".torrent"):
+                flash("Only .torrent files can be uploaded.")
+                return redirect(url_for("browse.zip_list"))
+            tmp_dir = tempfile.mkdtemp(prefix="zipbrowser_upload_")
+            save_path = os.path.join(tmp_dir, fname)
+            uploaded.save(save_path)
+            source = save_path
+
+        if not source:
+            flash("Please provide a URL, magnet link, path, or upload a .torrent file.")
+            return redirect(url_for("browse.zip_list"))
+
+        # Expand ~ to home directory for local paths
+        if not zip_manager.is_url(source) and not zip_manager.is_magnet(source):
+            source = os.path.expanduser(source)
+
+        # Validate: must be a URL, magnet link, or an existing local path
+        is_url = zip_manager.is_url(source)
+        is_magnet = zip_manager.is_magnet(source)
+        is_local = not is_url and not is_magnet and os.path.exists(source)
+
+        if not is_url and not is_magnet and not is_local:
+            flash(f"Invalid source: not a URL, magnet link, or existing path.")
+            return redirect(url_for("browse.zip_list"))
+
+        before = set(zip_manager.get_all_zip_files().keys())
+        zip_manager.initialize_zip_files(source)
+        after = set(zip_manager.get_all_zip_files().keys())
+        added = after - before
+
+        if added:
+            flash(f"Added {len(added)} new source(s).")
+        else:
+            flash("Source already loaded or contains no browsable content.")
+
+        return redirect(url_for("browse.zip_list"))
+
+    @bp.route("/remove_source/<zip_id>", methods=["POST"])
+    @login_required
+    def remove_source(zip_id):
+        """Remove a loaded archive source."""
+        zip_info = zip_manager.get_zip_info(zip_id)
+        if not zip_info:
+            flash("Source not found.")
+            return redirect(url_for("browse.zip_list"))
+
+        name = zip_info.get("name", zip_id)
+        zfile = zip_info.get("zfile")
+        if zfile:
+            try:
+                zfile.close()
+            except Exception:
+                pass
+
+        del zip_manager.zip_files[zip_id]
+        flash(f"Removed: {name}")
+        return redirect(url_for("browse.zip_list"))
+
     @bp.route("/unlock/<zip_id>", methods=["POST"])
     @login_required
     def unlock_zip(zip_id):
@@ -68,6 +140,7 @@ def create_browse_routes(zip_manager, user_manager=None):
     @login_required
     def browse(zip_id, path=""):
         zip_info = zip_manager.get_zip_info(zip_id)
+        print(f"Browsing ZIP: {zip_id}, info: {zip_info}, path: {path}")
         if not zip_info:
             abort(404)
 
@@ -226,6 +299,12 @@ def create_browse_routes(zip_manager, user_manager=None):
         if not zip_info["zfile"]:
             if not zip_manager.load_zip_file(zip_id):
                 abort(404)
+
+        # For URL-backed handlers, redirect to the direct URL
+        direct_url = zip_manager.get_file_url(zip_id, path)
+        if direct_url:
+            from flask import redirect
+            return redirect(direct_url)
 
         try:
             zfile = zip_manager.get_zip_file_object(zip_id)

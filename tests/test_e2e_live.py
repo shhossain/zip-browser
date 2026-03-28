@@ -45,7 +45,7 @@ from urllib.request import (
 import pytest
 from PIL import Image
 
-from src.utils import get_zip_file_hash
+from src.utils import get_source_hash
 
 
 # ──────────────────────────────────────────────────────────────────
@@ -199,9 +199,9 @@ def server(workspace):
         "port": port,
         "proc": proc,
         "workspace": workspace,
-        "zid_sample": get_zip_file_hash(str(workspace["sample_zip"])),
-        "zid_images": get_zip_file_hash(str(workspace["images_zip"])),
-        "zid_mixed": get_zip_file_hash(str(workspace["mixed_zip"])),
+        "zid_sample": get_source_hash(str(workspace["sample_zip"])),
+        "zid_images": get_source_hash(str(workspace["images_zip"])),
+        "zid_mixed": get_source_hash(str(workspace["mixed_zip"])),
     }
 
     # Teardown: stop the server gracefully

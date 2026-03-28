@@ -28,7 +28,7 @@ from src.config import Config
 from src.auth import AuthManager
 from src.user_manager import UserManager
 from src.zip_manager import ZipManager
-from src.utils import get_zip_file_hash
+from src.utils import get_source_hash
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +261,7 @@ class TestLiveServerBrowse:
     def test_browse_root(self, live_server, http_client):
         base_url, live_zip = live_server
         self._login(base_url, http_client)
-        zip_id = get_zip_file_hash(live_zip)
+        zip_id = get_source_hash(live_zip)
         resp = http_client.open(f"{base_url}/browse/{zip_id}/")
         assert resp.status == 200
         html = resp.read().decode()
@@ -270,7 +270,7 @@ class TestLiveServerBrowse:
     def test_browse_subfolder(self, live_server, http_client):
         base_url, live_zip = live_server
         self._login(base_url, http_client)
-        zip_id = get_zip_file_hash(live_zip)
+        zip_id = get_source_hash(live_zip)
         resp = http_client.open(f"{base_url}/browse/{zip_id}/folder")
         assert resp.status == 200
         html = resp.read().decode()
@@ -279,7 +279,7 @@ class TestLiveServerBrowse:
     def test_view_file(self, live_server, http_client):
         base_url, live_zip = live_server
         self._login(base_url, http_client)
-        zip_id = get_zip_file_hash(live_zip)
+        zip_id = get_source_hash(live_zip)
         resp = http_client.open(f"{base_url}/view/{zip_id}/hello.txt")
         assert resp.status == 200
         body = resp.read()
@@ -312,7 +312,7 @@ class TestLiveServerSearch:
     def test_search_returns_results(self, live_server, http_client):
         base_url, live_zip = live_server
         self._login(base_url, http_client)
-        zip_id = get_zip_file_hash(live_zip)
+        zip_id = get_source_hash(live_zip)
         resp = http_client.open(f"{base_url}/search/{zip_id}?q=hello")
         assert resp.status == 200
         html = resp.read().decode()
@@ -321,14 +321,14 @@ class TestLiveServerSearch:
     def test_search_empty_query(self, live_server, http_client):
         base_url, live_zip = live_server
         self._login(base_url, http_client)
-        zip_id = get_zip_file_hash(live_zip)
+        zip_id = get_source_hash(live_zip)
         resp = http_client.open(f"{base_url}/search/{zip_id}?q=")
         assert resp.status == 200
 
     def test_search_no_results(self, live_server, http_client):
         base_url, live_zip = live_server
         self._login(base_url, http_client)
-        zip_id = get_zip_file_hash(live_zip)
+        zip_id = get_source_hash(live_zip)
         resp = http_client.open(f"{base_url}/search/{zip_id}?q=zzzzzznonexistent")
         assert resp.status == 200
 
@@ -339,7 +339,7 @@ class TestLiveServerProtection:
     def test_unauthenticated_browse_redirects(self, live_server):
         """Accessing protected routes without login should redirect."""
         base_url, live_zip = live_server
-        zip_id = get_zip_file_hash(live_zip)
+        zip_id = get_source_hash(live_zip)
         # Fresh client without cookies
         try:
             resp = urllib.request.urlopen(f"{base_url}/browse/{zip_id}/")

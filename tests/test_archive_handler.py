@@ -239,11 +239,11 @@ class TestZipManagerWithArchives:
 
     def test_load_tar_archive(self, sample_tar):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_tar])
-        zip_id = get_zip_file_hash(sample_tar)
+        zip_id = get_source_hash(sample_tar)
         result = zm.load_zip_file(zip_id)
         assert result is not None
         tree = zm.zip_files[zip_id]["tree"]
@@ -251,11 +251,11 @@ class TestZipManagerWithArchives:
 
     def test_load_tar_gz_archive(self, sample_tar_gz):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_tar_gz])
-        zip_id = get_zip_file_hash(sample_tar_gz)
+        zip_id = get_source_hash(sample_tar_gz)
         result = zm.load_zip_file(zip_id)
         assert result is not None
         tree = zm.zip_files[zip_id]["tree"]
@@ -264,31 +264,31 @@ class TestZipManagerWithArchives:
 
     def test_load_tar_bz2_archive(self, sample_tar_bz2):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_tar_bz2])
-        zip_id = get_zip_file_hash(sample_tar_bz2)
+        zip_id = get_source_hash(sample_tar_bz2)
         result = zm.load_zip_file(zip_id)
         assert result is not None
 
     def test_load_tar_xz_archive(self, sample_tar_xz):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_tar_xz])
-        zip_id = get_zip_file_hash(sample_tar_xz)
+        zip_id = get_source_hash(sample_tar_xz)
         result = zm.load_zip_file(zip_id)
         assert result is not None
 
     def test_load_gz_archive(self, sample_gz):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_gz])
-        zip_id = get_zip_file_hash(sample_gz)
+        zip_id = get_source_hash(sample_gz)
         result = zm.load_zip_file(zip_id)
         assert result is not None
         tree = zm.zip_files[zip_id]["tree"]
@@ -297,11 +297,11 @@ class TestZipManagerWithArchives:
     @pytest.mark.skipif(not HAS_7Z, reason="py7zr not installed")
     def test_load_7z_archive(self, sample_7z):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_7z])
-        zip_id = get_zip_file_hash(sample_7z)
+        zip_id = get_source_hash(sample_7z)
         result = zm.load_zip_file(zip_id)
         assert result is not None
         tree = zm.zip_files[zip_id]["tree"]
@@ -309,11 +309,11 @@ class TestZipManagerWithArchives:
 
     def test_search_in_tar(self, sample_tar):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_tar])
-        zip_id = get_zip_file_hash(sample_tar)
+        zip_id = get_source_hash(sample_tar)
         zm.load_zip_file(zip_id)
         results = zm.search_files(zip_id, "readme")
         assert len(results) >= 1
@@ -321,11 +321,11 @@ class TestZipManagerWithArchives:
 
     def test_get_file_object_tar(self, sample_tar):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_tar])
-        zip_id = get_zip_file_hash(sample_tar)
+        zip_id = get_source_hash(sample_tar)
         zm.load_zip_file(zip_id)
         zfile = zm.get_zip_file_object(zip_id)
         assert zfile is not None
@@ -336,11 +336,11 @@ class TestZipManagerWithArchives:
     @pytest.mark.skipif(not HAS_7Z, reason="py7zr not installed")
     def test_get_file_object_7z(self, sample_7z):
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_7z])
-        zip_id = get_zip_file_hash(sample_7z)
+        zip_id = get_source_hash(sample_7z)
         zm.load_zip_file(zip_id)
         zfile = zm.get_zip_file_object(zip_id)
         assert zfile is not None
@@ -365,11 +365,11 @@ class TestZipManagerWithArchives:
     def test_browse_tar_tree(self, sample_tar):
         """Test building and navigating tree from a tar archive."""
         from src.zip_manager import ZipManager
-        from src.utils import get_zip_file_hash
+        from src.utils import get_source_hash
 
         zm = ZipManager()
         zm.initialize_zip_files([sample_tar])
-        zip_id = get_zip_file_hash(sample_tar)
+        zip_id = get_source_hash(sample_tar)
         zm.load_zip_file(zip_id)
 
         # Root should have readme.txt, docs, images

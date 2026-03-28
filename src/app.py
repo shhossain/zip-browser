@@ -59,10 +59,10 @@ def create_main_parser():
 
     # Legacy single-user mode (for backward compatibility)
     server_parser.add_argument(
-        "-u", "--username", help="Username for single-user mode (legacy)"
+        "-u", "--username", help="Username for single-user mode (legacy)", default="admin"
     )
     server_parser.add_argument(
-        "-p", "--password", help="Password for single-user mode (legacy)"
+        "-p", "--password", help="Password for single-user mode (legacy)", default="admin"
     )
 
     # User management command

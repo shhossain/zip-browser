@@ -8,7 +8,7 @@ import pytest
 
 from src.user_manager import UserManager
 from src.zip_manager import ZipManager
-from src.utils import get_zip_file_hash
+from src.utils import get_source_hash
 
 
 # ==============================================================
@@ -77,7 +77,7 @@ class TestUserManagerPreferences:
 # ==============================================================
 class TestOpenWithRoutes:
     def test_open_with_text(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         # Load the archive
         logged_in_client.get(f"/browse/{zip_id}/")
         resp = logged_in_client.get(f"/open-with/text/{zip_id}/readme.txt")
@@ -86,21 +86,21 @@ class TestOpenWithRoutes:
         assert b"Hello World" in resp.data
 
     def test_open_with_download(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         logged_in_client.get(f"/browse/{zip_id}/")
         resp = logged_in_client.get(f"/open-with/download/{zip_id}/readme.txt")
         assert resp.status_code == 200
         assert resp.content_type == "application/octet-stream"
 
     def test_open_with_image(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         logged_in_client.get(f"/browse/{zip_id}/")
         resp = logged_in_client.get(f"/open-with/image/{zip_id}/readme.txt")
         assert resp.status_code == 200
         assert resp.content_type == "image/png"
 
     def test_open_with_default(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         logged_in_client.get(f"/browse/{zip_id}/")
         resp = logged_in_client.get(f"/open-with/default/{zip_id}/readme.txt")
         assert resp.status_code == 200
@@ -108,13 +108,13 @@ class TestOpenWithRoutes:
         assert "text/plain" in resp.content_type
 
     def test_open_with_invalid_handler(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         logged_in_client.get(f"/browse/{zip_id}/")
         resp = logged_in_client.get(f"/open-with/foobar/{zip_id}/readme.txt")
         assert resp.status_code == 400
 
     def test_open_with_archive_redirects(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         logged_in_client.get(f"/browse/{zip_id}/")
         resp = logged_in_client.get(f"/open-with/archive/{zip_id}/readme.txt")
         assert resp.status_code == 302
@@ -124,7 +124,7 @@ class TestOpenWithRoutes:
         assert resp.status_code == 404
 
     def test_open_with_options_returns_handlers(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         logged_in_client.get(f"/browse/{zip_id}/")
         resp = logged_in_client.get(f"/open-with-options/{zip_id}/readme.txt")
         assert resp.status_code == 200
@@ -138,7 +138,7 @@ class TestOpenWithRoutes:
         assert data["saved"] is None  # no preference saved yet
 
     def test_open_with_options_shows_saved_pref(self, logged_in_client, sample_zip, user_manager):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         logged_in_client.get(f"/browse/{zip_id}/")
         # Save a preference
         user_manager.set_open_with_pref("testuser", ".txt", "text")

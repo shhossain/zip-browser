@@ -5,7 +5,7 @@ import os
 import tempfile
 
 from src.utils import (
-    get_zip_file_hash,
+    get_source_hash,
     is_image,
     is_video,
     is_browser_native_video,
@@ -25,24 +25,24 @@ class TestGetZipFileHash:
     def test_local_file_hash(self, tmp_path):
         f = tmp_path / "test.zip"
         f.write_text("data")
-        h = get_zip_file_hash(str(f))
+        h = get_source_hash(str(f))
         assert isinstance(h, str)
         assert len(h) == 12
 
     def test_same_file_same_hash(self, tmp_path):
         f = tmp_path / "test.zip"
         f.write_text("data")
-        assert get_zip_file_hash(str(f)) == get_zip_file_hash(str(f))
+        assert get_source_hash(str(f)) == get_source_hash(str(f))
 
     def test_url_hash(self):
         url = "https://example.com/archive.zip"
-        h = get_zip_file_hash(url)
+        h = get_source_hash(url)
         assert isinstance(h, str)
         assert len(h) == 12
 
     def test_url_deterministic(self):
         url = "https://example.com/archive.zip"
-        assert get_zip_file_hash(url) == get_zip_file_hash(url)
+        assert get_source_hash(url) == get_source_hash(url)
 
 
 # ---------------------------------------------------------------------------

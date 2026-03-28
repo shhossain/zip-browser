@@ -7,7 +7,7 @@ import zipfile
 
 import pytest
 
-from src.utils import get_zip_file_hash
+from src.utils import get_source_hash
 
 
 # ---------------------------------------------------------------------------
@@ -61,13 +61,13 @@ class TestBrowseRoutes:
         assert b"sample.zip" in resp.data
 
     def test_browse_root(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(f"/browse/{zip_id}/")
         assert resp.status_code == 200
         assert b"readme.txt" in resp.data
 
     def test_browse_subfolder(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(f"/browse/{zip_id}/docs")
         assert resp.status_code == 200
         assert b"guide.md" in resp.data
@@ -77,25 +77,25 @@ class TestBrowseRoutes:
         assert resp.status_code == 404
 
     def test_browse_invalid_path(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(f"/browse/{zip_id}/no_such_folder")
         assert resp.status_code == 404
 
     def test_browse_pagination_params(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(
             f"/browse/{zip_id}/?view=details&sort=name&order=desc&page=1&per_page=10&thumb_size=150"
         )
         assert resp.status_code == 200
 
     def test_view_file(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(f"/view/{zip_id}/readme.txt")
         assert resp.status_code == 200
         assert b"Hello World" in resp.data
 
     def test_view_file_not_found(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(f"/view/{zip_id}/nonexistent.txt")
         # The route catches KeyError and returns 200 with an error message
         assert resp.status_code == 200
@@ -153,7 +153,7 @@ class TestThumbnailRoute:
 
         with flask_app.test_client() as c:
             c.post("/login", data={"username": "imguser", "password": "pass"})
-            zip_id = get_zip_file_hash(image_zip)
+            zip_id = get_source_hash(image_zip)
             resp = c.get(f"/thumb/{zip_id}/photo.jpg?size=100")
             assert resp.status_code == 200
             assert resp.content_type == "image/jpeg"
@@ -169,17 +169,17 @@ class TestThumbnailRoute:
 
 class TestSearchRoutes:
     def test_search_page(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(f"/search/{zip_id}?q=readme")
         assert resp.status_code == 200
 
     def test_search_empty_query(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(f"/search/{zip_id}?q=")
         assert resp.status_code == 200
 
     def test_search_no_results(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         resp = logged_in_client.get(f"/search/{zip_id}?q=xyznonexistent")
         assert resp.status_code == 200
 
@@ -188,7 +188,7 @@ class TestSearchRoutes:
         assert resp.status_code == 404
 
     def test_search_with_type_filter(self, logged_in_client, sample_zip):
-        zip_id = get_zip_file_hash(sample_zip)
+        zip_id = get_source_hash(sample_zip)
         for stype in ("all", "images", "videos", "folders", "files"):
             resp = logged_in_client.get(f"/search/{zip_id}?q=a&type={stype}")
             assert resp.status_code == 200
